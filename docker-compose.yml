@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: spring-ai
+    environment:
+      POSTGRES_DB: spring_ai
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql   # PG18+ stores data in a versioned subdir; mount the parent, not /data
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d spring_ai" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Keycloak (shared `llm-gateway` realm) is run from the llm-gateway repo's docker-compose —
+  # start that first so KEYCLOAK_ISSUER_URI below resolves. See llm-gateway/README.md.
+  app:
+    build: .
+    container_name: llm-orchestrator
+    ports:
+      - "8090:8090"
+    environment:
+      POSTGRES_HOST: postgres
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://host.docker.internal:8081/realms/llm-gateway}
+      GATEWAY_BASE_URL: ${GATEWAY_BASE_URL:-http://host.docker.internal:8080/llm/v1}
+      RAG_BASE_URL: ${RAG_BASE_URL:-http://host.docker.internal:8081/api/v1}
+      PLATFORM_OAUTH_CLIENT_SECRET: ${PLATFORM_OAUTH_CLIENT_SECRET}
+      MCP_OAUTH2_CLIENT_SECRET: ${MCP_OAUTH2_CLIENT_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

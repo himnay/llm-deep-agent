@@ -1,0 +1,216 @@
+app:
+  metadata:
+    project-name: LLM Orchestrator
+    description: Agentic orchestration over llm-gateway, llm-rag and llm-mcp tools
+    group-id: com.org.llm
+    artifact-id: llm-orchestrator
+    project-version: 0.0.1-SNAPSHOT
+
+server:
+  port: ${SERVER_PORT:8090} # see llm-gateway/llm-chat/llm-rag/llm-mcp READMEs for the rest of the port map
+  shutdown: graceful
+  servlet:
+    context-path: /orchestrator/v1
+
+spring:
+  application:
+    name: llm-orchestrator
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  docker:
+    compose:
+      enabled: false
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:spring_ai}
+    username: ${POSTGRES_USER:postgres}
+    password: ${POSTGRES_PASSWORD:postgres}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+    baseline-description: existing schema
+    table: flyway_schema_history_orchestrator
+  ai:
+    # Planner LLM — every agent "plan" step is a call to llm-gateway-core, not OpenAI directly,
+    # but Spring AI's OpenAI starter still needs an api-key property to wire its auto-configured
+    # beans; chat-memory uses the same provider as the rest of the platform.
+    openai:
+      api-key: ${OPENAI_API_KEY:sk-placeholder}
+    chat:
+      memory:
+        repository:
+          jdbc:
+            initialize-schema: always
+    mcp:
+      client:
+        enabled: true
+        initialized: false # AppConfig initializes each client individually so one unreachable server can't fail boot
+        toolcallback:
+          enabled: false # AppConfig builds the resilient provider manually
+        streamable-http:
+          connections:
+            # llm-mcp's servers — see ~/REPOS/LLM/llm-mcp/README.md for the full catalogue.
+            # Commented-out entries match llm-mcp's own docker-compose defaults (not started
+            # unless you run them locally with `./mvnw spring-boot:run`).
+            deployment:
+              url: ${MCP_DEPLOYMENT_URL:http://localhost:8082}
+            github:
+              url: ${MCP_GITHUB_URL:http://localhost:8085}
+            #            ticket:
+            #              url: http://localhost:8081
+            #            notification:
+            #              url: http://localhost:8083
+            #            hr:
+            #              url: http://localhost:8084
+            #            gmail:
+            #              url: http://localhost:8086
+            #            travel:
+            #              url: http://localhost:8087
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Shared Keycloak instance defined in llm-gateway's docker-compose.yml; this service
+          # has its own client (llm-orchestrator-client) in the same "llm-gateway" realm.
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8081/realms/llm-gateway}
+
+# Outbound auth for MCP servers that are themselves OAuth2 resource servers (currently:
+# deployment-service, against llm-mcp's own "org-mcp" Keycloak realm — a *different* realm
+# from the platform-wide "llm-gateway" one above).
+mcp:
+  oauth2:
+    token-uri: ${MCP_OAUTH2_TOKEN_URI:http://localhost:8180/realms/org-mcp/protocol/openid-connect/token}
+    client-id: ${MCP_OAUTH2_CLIENT_ID:llm-orchestrator}
+    client-secret: ${MCP_OAUTH2_CLIENT_SECRET:llm-orchestrator-secret}
+  # Static bearer token presented to every other (non-OAuth2) MCP server.
+  auth-token: ${MCP_AUTH_TOKEN:}
+
+# ── This service's own identity when calling INTO llm-gateway-core / llm-rag-pipeline ─────────
+# Both targets sit behind the same shared "llm-gateway" Keycloak realm, so one client-credentials
+# token (cached by PlatformTokenService) is reused for every outbound call to either of them.
+platform:
+  auth:
+    token-uri: ${PLATFORM_OAUTH_TOKEN_URI:http://localhost:8081/realms/llm-gateway/protocol/openid-connect/token}
+    client-id: ${PLATFORM_OAUTH_CLIENT_ID:llm-orchestrator-client}
+    client-secret: ${PLATFORM_OAUTH_CLIENT_SECRET:llm-orchestrator-dev-secret}
+
+# ── Downstream platform services ──────────────────────────────────────────────
+gateway:
+  base-url: ${GATEWAY_BASE_URL:http://localhost:8080/llm/v1}
+  provider: ${GATEWAY_PROVIDER:openai}
+  timeout-seconds: 60
+
+rag:
+  base-url: ${RAG_BASE_URL:http://localhost:8081/api/v1}
+  timeout-seconds: 60
+
+# ── Inbound security (this service's own API) ────────────────────────────────
+gateway-auth:
+  enabled: ${GATEWAY_AUTH_ENABLED:true}
+  cors:
+    allowed-origins: ${GATEWAY_CORS_ORIGINS:http://localhost:3000,http://localhost:8080}
+
+agent:
+  max-iterations: ${AGENT_MAX_ITERATIONS:6}
+  step-timeout-seconds: ${AGENT_STEP_TIMEOUT_SECONDS:30}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      gateway:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+      rag:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+      mcp-deployment:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+      mcp-github:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+      mcp-unknown:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+  retry:
+    instances:
+      gateway:
+        maxAttempts: 3
+        waitDuration: 1s
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+      rag:
+        maxAttempts: 3
+        waitDuration: 1s
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+      mcp-deployment:
+        maxAttempts: 2
+        waitDuration: 500ms
+      mcp-github:
+        maxAttempts: 2
+        waitDuration: 500ms
+      mcp-unknown:
+        maxAttempts: 2
+        waitDuration: 500ms
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,circuitbreakers
+  endpoint:
+    health:
+      show-details: when-authorized
+      show-components: when-authorized
+      roles: ACTUATOR
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+        liveness:
+          include: livenessState
+    info:
+      enabled: true
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/traces
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        agent.loop.execution: true
+      slo:
+        http.server.requests: 50ms,100ms,200ms,300ms,500ms,1s,2s,5s,10s
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+  info:
+    title: LLM Orchestrator API
+    description: Agentic orchestration over llm-gateway, llm-rag and llm-mcp tools
+    version: 0.0.1-SNAPSHOT
+
+# Console/JSON-file pattern and per-logger levels live in logback-spring.xml — Boot's
+# logging.pattern.* properties are ignored once a custom logback config is present.
