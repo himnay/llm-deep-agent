@@ -1,6 +1,7 @@
 package com.org.llm.deepagent.agent;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -12,14 +13,15 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.org.llm.deepagent.client.GatewayClient;
 import com.org.llm.deepagent.client.dto.GatewayChatResponse;
+import com.org.llm.deepagent.exception.InvalidRunStateException;
 import com.org.llm.deepagent.persistence.AgentRunRepository;
 import com.org.llm.deepagent.persistence.AgentTaskRepository;
+import com.org.llm.deepagent.persistence.ApprovalAuditRepository;
 import com.org.llm.deepagent.routing.RoutingStrategyChain;
 import com.org.llm.deepagent.routing.StepResult;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +40,8 @@ class AgentLoopExecutorTest {
   private final ToolCallbackProvider toolCallbackProvider = mock(ToolCallbackProvider.class);
   private final FakeAgentRunRepository agentRunRepository = new FakeAgentRunRepository();
   private final AgentTaskRepository agentTaskRepository = mock(AgentTaskRepository.class);
+  private final ApprovalAuditRepository approvalAuditRepository =
+      mock(ApprovalAuditRepository.class);
   private final RunEventBroadcaster runEventBroadcaster = mock(RunEventBroadcaster.class);
   private final AgentProperties agentProperties = new AgentProperties();
   // Synchronous "executor": runs the submitted loop inline, so startRun()/approve()/reject() return
@@ -59,6 +63,7 @@ class AgentLoopExecutorTest {
             toolCallbackProvider,
             agentRunRepository,
             agentTaskRepository,
+            approvalAuditRepository,
             contextCompactor,
             runEventBroadcaster,
             agentProperties,
@@ -76,11 +81,12 @@ class AgentLoopExecutorTest {
             chatResponse(
                 "{\"action\":\"FINAL_ANSWER\",\"toolName\":null,\"input\":\"42\",\"reasoning\":\"done\"}"));
 
-    AgentRun run = executor.startRun("what is the answer?", "session-1");
+    AgentRun run = executor.startRun("what is the answer?", "session-1", "tester");
 
     assertThat(run.status()).isEqualTo(AgentRunStatus.COMPLETED);
     assertThat(run.finalAnswer()).isEqualTo("42");
     assertThat(run.steps()).isEmpty();
+    assertThat(run.createdBy()).isEqualTo("tester");
     verify(routingStrategyChain, never()).dispatch(any(), any());
   }
 
@@ -96,7 +102,7 @@ class AgentLoopExecutorTest {
                 "{\"action\":\"FINAL_ANSWER\",\"toolName\":null,\"input\":\"final\",\"reasoning\":\"r2\"}"));
     when(routingStrategyChain.dispatch(any(), any())).thenReturn(StepResult.ok("observation-1"));
 
-    AgentRun run = executor.startRun("question", "session-1");
+    AgentRun run = executor.startRun("question", "session-1", "tester");
 
     assertThat(run.status()).isEqualTo(AgentRunStatus.COMPLETED);
     assertThat(run.finalAnswer()).isEqualTo("final");
@@ -115,7 +121,7 @@ class AgentLoopExecutorTest {
                 "{\"action\":\"GATEWAY_LLM\",\"toolName\":null,\"input\":\"x\",\"reasoning\":\"r\"}"));
     when(routingStrategyChain.dispatch(any(), any())).thenReturn(StepResult.ok("still working"));
 
-    AgentRun run = executor.startRun("question", null);
+    AgentRun run = executor.startRun("question", null, "tester");
 
     assertThat(run.status()).isEqualTo(AgentRunStatus.INCOMPLETE);
     assertThat(run.finalAnswer()).isEqualTo("still working");
@@ -128,7 +134,7 @@ class AgentLoopExecutorTest {
   void unparseablePlannerOutputBecomesFinalAnswer() {
     when(gatewayClient.query(anyString(), anyString())).thenReturn(chatResponse("not json at all"));
 
-    AgentRun run = executor.startRun("question", null);
+    AgentRun run = executor.startRun("question", null, "tester");
 
     assertThat(run.status()).isEqualTo(AgentRunStatus.COMPLETED);
     assertThat(run.finalAnswer()).isEqualTo("not json at all");
@@ -143,7 +149,7 @@ class AgentLoopExecutorTest {
             chatResponse(
                 "```json\n{\"action\":\"FINAL_ANSWER\",\"toolName\":null,\"input\":\"ok\",\"reasoning\":\"r\"}\n```"));
 
-    AgentRun run = executor.startRun("question", null);
+    AgentRun run = executor.startRun("question", null, "tester");
 
     assertThat(run.status()).isEqualTo(AgentRunStatus.COMPLETED);
     assertThat(run.finalAnswer()).isEqualTo("ok");
@@ -158,7 +164,7 @@ class AgentLoopExecutorTest {
             new GatewayChatResponse(
                 null, null, "llm-gateway-core", "gateway unreachable", null, null, null, 0L, null));
 
-    AgentRun run = executor.startRun("question", null);
+    AgentRun run = executor.startRun("question", null, "tester");
 
     assertThat(run.status()).isEqualTo(AgentRunStatus.COMPLETED);
     assertThat(run.finalAnswer()).contains("gateway unreachable");
@@ -167,15 +173,14 @@ class AgentLoopExecutorTest {
 
   @Test
   @DisplayName(
-      "an action in agent.approval-required-actions pauses the run instead of dispatching it")
+      "an MCP_TOOL action pauses the run instead of dispatching it (default: every tool is gated)")
   void gatedActionPausesForApproval() {
-    agentProperties.setApprovalRequiredActions(EnumSet.of(AgentAction.MCP_TOOL));
     when(gatewayClient.query(anyString(), anyString()))
         .thenReturn(
             chatResponse(
                 "{\"action\":\"MCP_TOOL\",\"toolName\":\"deploy\",\"input\":\"{}\",\"reasoning\":\"r\"}"));
 
-    AgentRun run = executor.startRun("deploy it", null);
+    AgentRun run = executor.startRun("deploy it", null, "tester");
 
     assertThat(run.status()).isEqualTo(AgentRunStatus.AWAITING_APPROVAL);
     assertThat(run.pendingAction().toolName()).isEqualTo("deploy");
@@ -184,9 +189,27 @@ class AgentLoopExecutorTest {
   }
 
   @Test
+  @DisplayName("agent.approval-required-mcp-tools can narrow gating to specific tools only")
+  void approvalGatingCanBeNarrowedToSpecificTools() {
+    agentProperties.setApprovalRequiredMcpTools(List.of("deploy*"));
+    when(gatewayClient.query(anyString(), anyString()))
+        .thenReturn(
+            chatResponse(
+                "{\"action\":\"MCP_TOOL\",\"toolName\":\"getStatus\",\"input\":\"{}\",\"reasoning\":\"r\"}"))
+        .thenReturn(
+            chatResponse(
+                "{\"action\":\"FINAL_ANSWER\",\"toolName\":null,\"input\":\"ok\",\"reasoning\":\"r2\"}"));
+    when(routingStrategyChain.dispatch(any(), any())).thenReturn(StepResult.ok("status: healthy"));
+
+    AgentRun run = executor.startRun("check status", null, "tester");
+
+    assertThat(run.status()).isEqualTo(AgentRunStatus.COMPLETED);
+    verify(routingStrategyChain, times(1)).dispatch(any(), any());
+  }
+
+  @Test
   @DisplayName("approve() dispatches the pending action and resumes the loop to completion")
   void approveDispatchesPendingActionAndResumes() {
-    agentProperties.setApprovalRequiredActions(EnumSet.of(AgentAction.MCP_TOOL));
     when(gatewayClient.query(anyString(), anyString()))
         .thenReturn(
             chatResponse(
@@ -196,21 +219,22 @@ class AgentLoopExecutorTest {
                 "{\"action\":\"FINAL_ANSWER\",\"toolName\":null,\"input\":\"deployed\",\"reasoning\":\"r2\"}"));
     when(routingStrategyChain.dispatch(any(), any()))
         .thenReturn(StepResult.ok("deployment started"));
-    AgentRun paused = executor.startRun("deploy it", null);
+    AgentRun paused = executor.startRun("deploy it", null, "tester");
 
-    AgentRun resumed = executor.approve(paused.id());
+    AgentRun resumed = executor.approve(paused.id(), "reviewer-1");
 
     assertThat(resumed.status()).isEqualTo(AgentRunStatus.COMPLETED);
     assertThat(resumed.finalAnswer()).isEqualTo("deployed");
     assertThat(resumed.steps()).hasSize(1);
     assertThat(resumed.steps().get(0).observation()).isEqualTo("deployment started");
     verify(routingStrategyChain, times(1)).dispatch(any(), any());
+    verify(approvalAuditRepository)
+        .record(paused.id(), 0, ApprovalDecision.APPROVED, "reviewer-1", null);
   }
 
   @Test
   @DisplayName("reject() feeds the rejection back as an observation instead of dispatching")
   void rejectFeedsBackObservationAndResumes() {
-    agentProperties.setApprovalRequiredActions(EnumSet.of(AgentAction.MCP_TOOL));
     when(gatewayClient.query(anyString(), anyString()))
         .thenReturn(
             chatResponse(
@@ -218,14 +242,69 @@ class AgentLoopExecutorTest {
         .thenReturn(
             chatResponse(
                 "{\"action\":\"FINAL_ANSWER\",\"toolName\":null,\"input\":\"cancelled\",\"reasoning\":\"r2\"}"));
-    AgentRun paused = executor.startRun("deploy it", null);
+    AgentRun paused = executor.startRun("deploy it", null, "tester");
 
-    AgentRun resumed = executor.reject(paused.id(), "too risky");
+    AgentRun resumed = executor.reject(paused.id(), "reviewer-1", "too risky");
 
     assertThat(resumed.status()).isEqualTo(AgentRunStatus.COMPLETED);
     assertThat(resumed.steps()).hasSize(1);
     assertThat(resumed.steps().get(0).observation()).contains("rejected").contains("too risky");
     verify(routingStrategyChain, never()).dispatch(any(), any());
+    verify(approvalAuditRepository)
+        .record(paused.id(), 0, ApprovalDecision.REJECTED, "reviewer-1", "too risky");
+  }
+
+  @Test
+  @DisplayName(
+      "a pending action can never be dispatched twice, even if approve() is called concurrently")
+  void approveCannotDispatchTheSamePendingActionTwice() {
+    when(gatewayClient.query(anyString(), anyString()))
+        .thenReturn(
+            chatResponse(
+                "{\"action\":\"MCP_TOOL\",\"toolName\":\"deploy\",\"input\":\"{}\",\"reasoning\":\"r\"}"));
+    when(routingStrategyChain.dispatch(any(), any()))
+        .thenReturn(StepResult.ok("deployment started"));
+    AgentRun paused = executor.startRun("deploy it", null, "tester");
+    // Simulates a second request winning a race to claim the pending action first.
+    agentRunRepository.claimPendingAction(paused.id());
+
+    assertThatThrownBy(() -> executor.approve(paused.id(), "reviewer-1"))
+        .isInstanceOf(InvalidRunStateException.class);
+    verify(routingStrategyChain, never()).dispatch(any(), any());
+  }
+
+  @Test
+  @DisplayName(
+      "cancel() stops a run awaiting approval and is idempotent once it's already terminal")
+  void cancelStopsRunAndIsIdempotent() {
+    when(gatewayClient.query(anyString(), anyString()))
+        .thenReturn(
+            chatResponse(
+                "{\"action\":\"MCP_TOOL\",\"toolName\":\"deploy\",\"input\":\"{}\",\"reasoning\":\"r\"}"));
+    AgentRun paused = executor.startRun("deploy it", null, "tester");
+    assertThat(paused.status()).isEqualTo(AgentRunStatus.AWAITING_APPROVAL);
+
+    AgentRun cancelled = executor.cancel(paused.id());
+    assertThat(cancelled.status()).isEqualTo(AgentRunStatus.CANCELLED);
+
+    AgentRun secondCancelAttempt = executor.cancel(paused.id());
+    assertThat(secondCancelAttempt.status()).isEqualTo(AgentRunStatus.CANCELLED);
+  }
+
+  @Test
+  @DisplayName("exceeding agent.max-total-tokens stops the run as INCOMPLETE instead of continuing")
+  void exceedingTokenBudgetStopsTheRun() {
+    agentProperties.setMaxTotalTokens(1);
+    when(gatewayClient.query(anyString(), anyString()))
+        .thenReturn(
+            chatResponse(
+                "{\"action\":\"GATEWAY_LLM\",\"toolName\":null,\"input\":\"x\",\"reasoning\":\"r\"}"));
+    when(routingStrategyChain.dispatch(any(), any())).thenReturn(StepResult.ok("partial progress"));
+
+    AgentRun run = executor.startRun("question", null, "tester");
+
+    assertThat(run.status()).isEqualTo(AgentRunStatus.INCOMPLETE);
+    assertThat(run.finalAnswer()).contains("token budget");
   }
 
   @Test
@@ -236,13 +315,17 @@ class AgentLoopExecutorTest {
         .thenReturn(
             chatResponse(
                 "{\"action\":\"FINAL_ANSWER\",\"toolName\":null,\"input\":\"sub-answer\",\"reasoning\":\"r\"}"));
+    long parentRunId =
+        agentRunRepository.createRun("session-1", "parent task", null, null, "tester");
 
-    AgentRun subRun = executor.runSubAgentToCompletion("sub task", "session-1", 1L, 1L);
+    AgentRun subRun =
+        executor.runSubAgentToCompletion("sub task", "session-1", parentRunId, parentRunId);
 
     assertThat(subRun.status()).isEqualTo(AgentRunStatus.COMPLETED);
     assertThat(subRun.finalAnswer()).isEqualTo("sub-answer");
-    assertThat(subRun.parentRunId()).isEqualTo(1L);
-    assertThat(subRun.rootRunId()).isEqualTo(1L);
+    assertThat(subRun.parentRunId()).isEqualTo(parentRunId);
+    assertThat(subRun.rootRunId()).isEqualTo(parentRunId);
+    assertThat(subRun.createdBy()).isEqualTo("tester");
 
     ArgumentCaptor<String> systemPromptCaptor = ArgumentCaptor.forClass(String.class);
     verify(gatewayClient).query(anyString(), systemPromptCaptor.capture());
@@ -257,7 +340,7 @@ class AgentLoopExecutorTest {
             chatResponse(
                 "{\"action\":\"FINAL_ANSWER\",\"toolName\":null,\"input\":\"ok\",\"reasoning\":\"r\"}"));
 
-    executor.startRun("question", null);
+    executor.startRun("question", null, "tester");
 
     ArgumentCaptor<String> systemPromptCaptor = ArgumentCaptor.forClass(String.class);
     verify(gatewayClient).query(anyString(), systemPromptCaptor.capture());
@@ -285,11 +368,17 @@ class AgentLoopExecutorTest {
 
     @Override
     public long createRun(String sessionId, String prompt) {
-      return createRun(sessionId, prompt, null, null);
+      return createRun(sessionId, prompt, null, null, null);
     }
 
     @Override
     public long createRun(String sessionId, String prompt, Long parentRunId, Long rootRunId) {
+      return createRun(sessionId, prompt, parentRunId, rootRunId, null);
+    }
+
+    @Override
+    public long createRun(
+        String sessionId, String prompt, Long parentRunId, Long rootRunId, String createdBy) {
       long id = nextId++;
       long root = rootRunId != null ? rootRunId : id;
       runs.put(
@@ -307,7 +396,9 @@ class AgentLoopExecutorTest {
               root,
               null,
               0,
-              null));
+              null,
+              createdBy,
+              0));
       stepsByRunId.put(id, new ArrayList<>());
       return id;
     }
@@ -332,9 +423,57 @@ class AgentLoopExecutorTest {
     }
 
     @Override
-    public void clearPendingAction(long runId) {
+    public boolean claimPendingAction(long runId) {
       AgentRun run = runs.get(runId);
+      if (run == null || run.status() != AgentRunStatus.AWAITING_APPROVAL) {
+        return false;
+      }
       runs.put(runId, withStatus(run, AgentRunStatus.RUNNING, run.finalAnswer(), null));
+      return true;
+    }
+
+    @Override
+    public boolean cancelIfNotTerminal(long runId) {
+      AgentRun run = runs.get(runId);
+      if (run == null
+          || (run.status() != AgentRunStatus.RUNNING
+              && run.status() != AgentRunStatus.AWAITING_APPROVAL)) {
+        return false;
+      }
+      runs.put(runId, withStatus(run, AgentRunStatus.CANCELLED, run.finalAnswer(), null));
+      return true;
+    }
+
+    @Override
+    public void addTokensUsed(long runId, int tokens) {
+      if (tokens <= 0) {
+        return;
+      }
+      AgentRun run = runs.get(runId);
+      runs.put(
+          runId,
+          new AgentRun(
+              run.id(),
+              run.sessionId(),
+              run.prompt(),
+              run.status(),
+              run.finalAnswer(),
+              run.steps(),
+              run.createdAt(),
+              run.completedAt(),
+              run.parentRunId(),
+              run.rootRunId(),
+              run.contextSummary(),
+              run.summarizedStepCount(),
+              run.pendingAction(),
+              run.createdBy(),
+              run.totalTokensUsed() + tokens));
+    }
+
+    @Override
+    public RunControlState findControlState(long runId) {
+      AgentRun run = runs.get(runId);
+      return run == null ? null : new RunControlState(run.status(), run.totalTokensUsed());
     }
 
     @Override
@@ -355,7 +494,9 @@ class AgentLoopExecutorTest {
               run.rootRunId(),
               summary,
               summarizedStepCount,
-              run.pendingAction()));
+              run.pendingAction(),
+              run.createdBy(),
+              run.totalTokensUsed()));
     }
 
     @Override
@@ -377,7 +518,9 @@ class AgentLoopExecutorTest {
           run.rootRunId(),
           run.contextSummary(),
           run.summarizedStepCount(),
-          run.pendingAction());
+          run.pendingAction(),
+          run.createdBy(),
+          run.totalTokensUsed());
     }
 
     @Override
@@ -407,7 +550,9 @@ class AgentLoopExecutorTest {
           run.rootRunId(),
           run.contextSummary(),
           run.summarizedStepCount(),
-          pendingAction);
+          pendingAction,
+          run.createdBy(),
+          run.totalTokensUsed());
     }
   }
 }

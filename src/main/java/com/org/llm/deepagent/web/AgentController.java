@@ -6,6 +6,7 @@ import com.org.llm.deepagent.agent.AgentTask;
 import com.org.llm.deepagent.agent.RunEventBroadcaster;
 import com.org.llm.deepagent.exception.AgentArtifactNotFoundException;
 import com.org.llm.deepagent.exception.AgentRunNotFoundException;
+import com.org.llm.deepagent.exception.RunAccessDeniedException;
 import com.org.llm.deepagent.persistence.AgentArtifactRepository;
 import com.org.llm.deepagent.persistence.AgentRunRepository;
 import com.org.llm.deepagent.persistence.AgentTaskRepository;
@@ -20,6 +21,9 @@ import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,7 +33,11 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
- * {@code /agent/run} — kick off, follow, approve/reject, and inspect agentic orchestration runs.
+ * {@code /agent/run} — kick off, follow, approve/reject/cancel, and inspect agentic orchestration
+ * runs. Every endpoint taking a {@code runId} is restricted to the run's creator (the JWT subject
+ * that started it, or {@code "anonymous"} when {@code gateway-auth.enabled=false}) or a principal
+ * with {@code ROLE_ADMIN} — see {@link #requireAccessibleRun}. Runs created before this restriction
+ * existed (a {@code null createdBy}) remain unrestricted.
  */
 @Slf4j
 @RestController
@@ -38,6 +46,8 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @Tag(name = "Agent")
 public class AgentController {
 
+  private static final String ADMIN_AUTHORITY = "ROLE_ADMIN";
+
   private final AgentLoopExecutor agentLoopExecutor;
   private final AgentRunRepository agentRunRepository;
   private final AgentTaskRepository agentTaskRepository;
@@ -45,8 +55,8 @@ public class AgentController {
   private final RunEventBroadcaster runEventBroadcaster;
 
   /**
-   * Starts a new top-level run; it executes in the background — see the class-level Javadoc for how
-   * to follow it.
+   * Starts a new top-level run, owned by the caller; it executes in the background — see the
+   * class-level Javadoc for how to follow it.
    */
   @PostMapping("/run")
   @Operation(
@@ -57,8 +67,9 @@ public class AgentController {
               + " immediately with status RUNNING. Follow progress via GET /agent/run/{id} (poll) or"
               + " GET /agent/run/{id}/events (SSE).")
   public AgentRunResponse run(@Valid @RequestBody AgentRunRequest request) {
-    log.info("AGENT | run requested | sessionId={}", request.sessionId());
-    AgentRun run = agentLoopExecutor.startRun(request.prompt(), request.sessionId());
+    String createdBy = currentPrincipal();
+    log.info("AGENT | run requested | sessionId={} | createdBy={}", request.sessionId(), createdBy);
+    AgentRun run = agentLoopExecutor.startRun(request.prompt(), request.sessionId(), createdBy);
     return toResponse(run);
   }
 
@@ -71,7 +82,7 @@ public class AgentController {
           "Returns the persisted plan/act/observe trace for a run, whatever its current status.")
   public AgentRunResponse getRun(
       @Parameter(description = "Numeric agent run id") @PathVariable long runId) {
-    return toResponse(requireRun(runId));
+    return toResponse(requireAccessibleRun(runId));
   }
 
   /**
@@ -88,7 +99,7 @@ public class AgentController {
               + " published while connected are received — use GET /agent/run/{id} for durable state.")
   public SseEmitter streamRun(
       @Parameter(description = "Numeric agent run id") @PathVariable long runId) {
-    requireRun(runId);
+    requireAccessibleRun(runId);
     return runEventBroadcaster.subscribe(runId);
   }
 
@@ -101,7 +112,8 @@ public class AgentController {
           "Only valid while status is AWAITING_APPROVAL; otherwise responds 409 Conflict.")
   public AgentRunResponse approve(
       @Parameter(description = "Numeric agent run id") @PathVariable long runId) {
-    return toResponse(agentLoopExecutor.approve(runId));
+    requireAccessibleRun(runId);
+    return toResponse(agentLoopExecutor.approve(runId, currentPrincipal()));
   }
 
   /** Rejects the action a run is currently paused on, feeding the rejection back to the planner. */
@@ -116,8 +128,23 @@ public class AgentController {
   public AgentRunResponse reject(
       @Parameter(description = "Numeric agent run id") @PathVariable long runId,
       @RequestBody(required = false) RunRejectionRequest request) {
+    requireAccessibleRun(runId);
     String reason = request == null ? null : request.reason();
-    return toResponse(agentLoopExecutor.reject(runId, reason));
+    return toResponse(agentLoopExecutor.reject(runId, currentPrincipal(), reason));
+  }
+
+  /** Cancels a run; idempotent — a no-op if it had already reached a terminal status. */
+  @PostMapping("/run/{runId}/cancel")
+  @Operation(
+      operationId = "cancelAgentRun",
+      summary = "Cancel a run",
+      description =
+          "Stops a RUNNING or AWAITING_APPROVAL run as soon as its background loop notices (within"
+              + " one iteration). A no-op, not an error, if the run already reached a terminal status.")
+  public AgentRunResponse cancel(
+      @Parameter(description = "Numeric agent run id") @PathVariable long runId) {
+    requireAccessibleRun(runId);
+    return toResponse(agentLoopExecutor.cancel(runId));
   }
 
   /** Fetches the full content of one scratchpad file belonging to a run's tree. */
@@ -130,19 +157,44 @@ public class AgentController {
   public AgentArtifactResponse getFile(
       @Parameter(description = "Numeric agent run id") @PathVariable long runId,
       @Parameter(description = "Scratchpad file path") @PathVariable String path) {
-    AgentRun run = requireRun(runId);
+    AgentRun run = requireAccessibleRun(runId);
     return agentArtifactRepository
         .findByRootRunIdAndPath(run.rootRunId(), path)
         .map(AgentArtifactResponse::from)
         .orElseThrow(() -> new AgentArtifactNotFoundException(run.rootRunId(), path));
   }
 
-  private AgentRun requireRun(long runId) {
+  /**
+   * Loads a run by id, then enforces that the caller is either its creator or {@code ROLE_ADMIN}.
+   * Runs with no recorded creator ({@code createdBy == null} — created before this check existed)
+   * remain accessible to anyone, matching this project's original (unrestricted) behavior.
+   */
+  private AgentRun requireAccessibleRun(long runId) {
     AgentRun run = agentRunRepository.findById(runId);
     if (run == null) {
       throw new AgentRunNotFoundException(runId);
     }
+    if (run.createdBy() != null && !run.createdBy().equals(currentPrincipal()) && !isAdmin()) {
+      throw new RunAccessDeniedException(runId);
+    }
     return run;
+  }
+
+  private String currentPrincipal() {
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    if (authentication == null
+        || !authentication.isAuthenticated()
+        || authentication instanceof AnonymousAuthenticationToken) {
+      return "anonymous";
+    }
+    return authentication.getName();
+  }
+
+  private boolean isAdmin() {
+    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    return authentication != null
+        && authentication.getAuthorities().stream()
+            .anyMatch(authority -> ADMIN_AUTHORITY.equals(authority.getAuthority()));
   }
 
   private AgentRunResponse toResponse(AgentRun run) {

@@ -117,7 +117,12 @@ agent:
   step-timeout-seconds: ${AGENT_STEP_TIMEOUT_SECONDS:30}
   compaction-trigger-steps: ${AGENT_COMPACTION_TRIGGER_STEPS:8}
   compaction-keep-recent-steps: ${AGENT_COMPACTION_KEEP_RECENT_STEPS:4}
-  approval-required-actions: ${AGENT_APPROVAL_REQUIRED_ACTIONS:MCP_TOOL}
+  # Non-MCP actions needing approval; empty by default (MCP tools are gated per-tool below instead).
+  approval-required-actions: ${AGENT_APPROVAL_REQUIRED_ACTIONS:}
+  approval-required-mcp-tools: ${AGENT_APPROVAL_REQUIRED_MCP_TOOLS:*}
+  max-total-tokens: ${AGENT_MAX_TOTAL_TOKENS:200000}
+  retention-days: ${AGENT_RETENTION_DAYS:30}
+  retention-cron-schedule: ${AGENT_RETENTION_CRON_SCHEDULE:0 0 3 * * *}
   session-history-limit: ${AGENT_SESSION_HISTORY_LIMIT:3}
   max-tasks: ${AGENT_MAX_TASKS:50}
   max-scratchpad-files: ${AGENT_MAX_SCRATCHPAD_FILES:20}

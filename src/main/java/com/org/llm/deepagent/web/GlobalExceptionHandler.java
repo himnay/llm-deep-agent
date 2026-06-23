@@ -4,6 +4,7 @@ import com.org.llm.deepagent.exception.AgentArtifactNotFoundException;
 import com.org.llm.deepagent.exception.AgentRunNotFoundException;
 import com.org.llm.deepagent.exception.InvalidRunStateException;
 import com.org.llm.deepagent.exception.McpToolCallException;
+import com.org.llm.deepagent.exception.RunAccessDeniedException;
 import com.org.llm.deepagent.exception.TokenAcquisitionException;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -33,6 +34,13 @@ public class GlobalExceptionHandler {
                 "Validation failed",
                 "One or more fields are invalid",
                 fieldErrors));
+  }
+
+  /** Maps an attempt to access a run owned by someone else to 403. */
+  @ExceptionHandler(RunAccessDeniedException.class)
+  public ResponseEntity<ApiError> handleAccessDenied(RunAccessDeniedException ex) {
+    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+        .body(ApiError.of(HttpStatus.FORBIDDEN.value(), "Access denied", ex.getMessage()));
   }
 
   /** Maps a lookup of a non-existent run id or scratchpad file to 404. */

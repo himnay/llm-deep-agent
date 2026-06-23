@@ -128,6 +128,8 @@ class ContextCompactorTest {
         1L,
         contextSummary,
         summarizedStepCount,
-        null);
+        null,
+        "tester",
+        0);
   }
 }

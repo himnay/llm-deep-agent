@@ -55,6 +55,7 @@ public class SubAgentRoutingStrategy implements RoutingStrategy {
                   + " before it can continue.");
       case FAILED, RUNNING ->
           StepResult.error("Sub-agent run failed: " + subAgentRun.finalAnswer());
+      case CANCELLED -> StepResult.error("Sub-agent run " + subAgentRun.id() + " was cancelled.");
     };
   }
 }

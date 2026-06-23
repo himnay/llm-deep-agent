@@ -77,7 +77,9 @@ class SubAgentRoutingStrategyTest {
             1L,
             null,
             0,
-            new PlannedAction(AgentAction.MCP_TOOL, "deploy", "{}", "r"));
+            new PlannedAction(AgentAction.MCP_TOOL, "deploy", "{}", "r"),
+            "tester",
+            0);
     when(agentLoopExecutor.runSubAgentToCompletion("do more", "s1", 1L, 1L)).thenReturn(awaiting);
 
     StepResult result =
@@ -103,6 +105,8 @@ class SubAgentRoutingStrategyTest {
         1L,
         null,
         0,
-        null);
+        null,
+        "tester",
+        0);
   }
 }

@@ -13,6 +13,10 @@ import java.util.List;
  * @param summarizedStepCount how many leading steps are already folded into {@code contextSummary}
  * @param pendingAction the action awaiting human approval, set only when {@code status ==
  *     AWAITING_APPROVAL}
+ * @param createdBy the JWT subject (or {@code "anonymous"} when auth is disabled) that started this
+ *     run, inherited by its sub-agents; {@code null} for rows created before this field existed
+ * @param totalTokensUsed cumulative prompt+completion tokens spent so far, checked against {@code
+ *     agent.max-total-tokens}
  */
 public record AgentRun(
     Long id,
@@ -27,4 +31,6 @@ public record AgentRun(
     Long rootRunId,
     String contextSummary,
     int summarizedStepCount,
-    PlannedAction pendingAction) {}
+    PlannedAction pendingAction,
+    String createdBy,
+    int totalTokensUsed) {}

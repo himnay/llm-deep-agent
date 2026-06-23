@@ -8,7 +8,9 @@ public enum AgentRunStatus {
    */
   AWAITING_APPROVAL,
   COMPLETED,
-  /** Hit {@code agent.max-iterations} without the planner returning FINAL_ANSWER. */
+  /** Hit {@code agent.max-iterations} or {@code agent.max-total-tokens} without a FINAL_ANSWER. */
   INCOMPLETE,
-  FAILED
+  FAILED,
+  /** Stopped via {@code POST /agent/run/{id}/cancel} before reaching a final answer. */
+  CANCELLED
 }

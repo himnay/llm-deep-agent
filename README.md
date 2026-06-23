@@ -47,17 +47,17 @@ debugging, auditing, or just polling a long-running task to completion.
 
 ## Tech Stack
 
-| Concern       | Technology                                                                 |
-|---------------|-----------------------------------------------------------------------------|
+| Concern       | Technology                                                                   |
+|---------------|------------------------------------------------------------------------------|
 | Language      | Java 25                                                                      |
 | Framework     | Spring Boot 4.1.0, Spring MVC (+ SSE via `SseEmitter`)                       |
 | AI            | Spring AI 2.0.0 — MCP client, OpenAI-compatible chat model, JDBC chat memory |
-| Persistence   | Spring JDBC (`JdbcTemplate`) + PostgreSQL + Flyway                          |
-| Security      | Spring Security OAuth2 Resource Server (Keycloak JWT)                       |
-| Resilience    | Resilience4j (retry + circuit breaker, per downstream dependency)           |
+| Persistence   | Spring JDBC (`JdbcTemplate`) + PostgreSQL + Flyway                           |
+| Security      | Spring Security OAuth2 Resource Server (Keycloak JWT)                        |
+| Resilience    | Resilience4j (retry + circuit breaker, per downstream dependency)            |
 | Observability | Actuator + Micrometer + Prometheus + OTLP tracing → Grafana Tempo            |
-| API docs      | springdoc-openapi (Swagger UI)                                              |
-| Build         | Maven, shared `super-pom` parent + `learning-bom` dependency management     |
+| API docs      | springdoc-openapi (Swagger UI)                                               |
+| Build         | Maven, shared `super-pom` parent + `learning-bom` dependency management      |
 
 No dependency or plugin version is hardcoded in this module's `pom.xml` — all versions come from
 `super-pom`/`learning-bom` properties, matching the convention in `llm-gateway`, `llm-chat`,
@@ -67,17 +67,17 @@ No dependency or plugin version is hardcoded in this module's `pom.xml` — all 
 
 ## Design Patterns (GoF)
 
-| Pattern                     | Where                                                          | Role                                                                                              |
-|------------------------------|-----------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
-| **Strategy**                 | `RoutingStrategy` + its 6 implementations                       | Each capability (gateway LLM, RAG, MCP tools, task planning, scratchpad, sub-agent delegation) is a swappable strategy for "act" |
-| **Chain of Responsibility**  | `RoutingStrategyChain`                                          | Tries each registered `RoutingStrategy` in turn; first one whose `supports()` matches handles the step |
-| **Facade**                   | `GatewayClient`, `RagClient`                                    | Hide the HTTP/auth/resilience plumbing behind a one-method call (`chat()`, `retrieve()`, `generate()`) |
-| **Proxy (protection)**       | `ResilientToolCallbackProvider`                                 | Wraps every MCP `ToolCallback` with retry + circuit breaker; an OPEN circuit returns a structured error instead of a doomed call |
-| **Template Method (loop)**   | `AgentLoopExecutor.continueRun`                                 | Fixed plan→act→observe→repeat skeleton; the "act" step varies per `RoutingStrategy`                  |
-| **Composite-like recursion** | `SubAgentRoutingStrategy` → nested `AgentLoopExecutor` run        | `DELEGATE_SUBAGENT` runs a whole isolated agent loop as a single step, quarantining its intermediate context from the parent's transcript |
-| **Memento**                  | `agent_run`/`agent_step`/`agent_task`/`agent_artifact` tables    | All run state is externalised so a run can be replayed (`GET /agent/run/{id}`) or *resumed* from any thread/request |
-| **Observer**                 | `RunEventBroadcaster`                                           | Fans out `step`/`awaiting_approval`/`done` events to every SSE subscriber of a run                   |
-| **Singleton**                | All Spring beans                                                | One shared, stateless instance per container                                                          |
+| Pattern                       | Where                                                            | Role                                                                                                                                      |
+|-------------------------------|------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
+| **Strategy**                  | `RoutingStrategy` + its 6 implementations                        | Each capability (gateway LLM, RAG, MCP tools, task planning, scratchpad, sub-agent delegation) is a swappable strategy for "act"          |
+| **Chain of Responsibility**   | `RoutingStrategyChain`                                           | Tries each registered `RoutingStrategy` in turn; first one whose `supports()` matches handles the step                                    |
+| **Facade**                    | `GatewayClient`, `RagClient`                                     | Hide the HTTP/auth/resilience plumbing behind a one-method call (`chat()`, `retrieve()`, `generate()`)                                    |
+| **Proxy (protection)**        | `ResilientToolCallbackProvider`                                  | Wraps every MCP `ToolCallback` with retry + circuit breaker; an OPEN circuit returns a structured error instead of a doomed call          |
+| **Template Method (loop)**    | `AgentLoopExecutor.continueRun`                                  | Fixed plan→act→observe→repeat skeleton; the "act" step varies per `RoutingStrategy`                                                       |
+| **Composite-like recursion**  | `SubAgentRoutingStrategy` → nested `AgentLoopExecutor` run       | `DELEGATE_SUBAGENT` runs a whole isolated agent loop as a single step, quarantining its intermediate context from the parent's transcript |
+| **Memento**                   | `agent_run`/`agent_step`/`agent_task`/`agent_artifact` tables    | All run state is externalised so a run can be replayed (`GET /agent/run/{id}`) or *resumed* from any thread/request                       |
+| **Observer**                  | `RunEventBroadcaster`                                            | Fans out `step`/`awaiting_approval`/`done` events to every SSE subscriber of a run                                                        |
+| **Singleton**                 | All Spring beans                                                 | One shared, stateless instance per container                                                                                              |
 
 ---
 
@@ -134,11 +134,43 @@ the parent (and vice versa) even though its intermediate reasoning steps are not
 
 ### Approval gates
 
-Actions in `agent.approval-required-actions` (default `MCP_TOOL`) pause the run with status
-`AWAITING_APPROVAL` and a persisted `pendingAction` instead of executing immediately.
+MCP tool calls are gated **per tool**, not as a blanket "every MCP_TOOL" rule:
+`agent.approval-required-mcp-tools` (default `*`) matches exact tool names or `prefix*` patterns —
+narrow it to just the mutating tools (e.g. `deploy*,delete*`) once you know your catalogue. Non-MCP
+actions (e.g. `RAG_GENERATE`) can additionally be gated via `agent.approval-required-actions`
+(empty by default). A gated action pauses the run with status `AWAITING_APPROVAL` and a persisted
+`pendingAction` instead of executing immediately.
+
 `POST /agent/run/{id}/approve` dispatches it and resumes; `POST /agent/run/{id}/reject` instead
 feeds the planner a synthetic "rejected" observation (with your reason, if given) so it can adapt
-rather than the run simply dying.
+rather than the run simply dying. Both calls are race-safe — the database-level conditional update
+behind `AgentRunRepository.claimPendingAction` guarantees a pending action is never dispatched
+twice even if two requests race to resolve it — and both are recorded in `agent_approval_audit`
+(who decided, when, and why) independently of `agent_step` so the accountability record survives
+retention cleanup.
+
+### Operational safeguards
+
+- **Ownership.** Every run is stamped with `createdBy` (the JWT subject, or `"anonymous"` when
+  `gateway-auth.enabled=false`) at creation. Every endpoint that takes a `runId` rejects callers who
+  aren't that creator or `ROLE_ADMIN` with 403 — except runs with no recorded creator (rows that
+  predate this check), which stay unrestricted.
+- **Token budget.** `agent.max-total-tokens` (default 200,000) caps cumulative prompt+completion
+  tokens across every planner/compaction call a run makes; exceeding it ends the run `INCOMPLETE`
+  rather than continuing to spend.
+- **Cancellation.** `POST /agent/run/{id}/cancel` stops a `RUNNING`/`AWAITING_APPROVAL` run as soon
+  as its loop notices (re-checked every iteration) — idempotent, a no-op once already terminal.
+- **Crash recovery.** On boot, `AgentRunRecoveryRunner` resubmits any run still `RUNNING` from a
+  prior process — safe because state is always rebuilt from the database, never held only in
+  memory. (Assumes a single instance against a given database.)
+- **Retention.** `AgentRunRetentionJob` prunes terminal top-level runs (and their sub-trees) older
+  than `agent.retention-days` (default 30) on a daily cron (`agent.retention-cron-schedule`).
+- **Error containment.** Any unexpected exception inside the loop is caught and turns the run
+  `FAILED` (with a generic message — details go to the server log, not the API response) instead of
+  silently dying on the background thread and leaving the row stuck at `RUNNING` forever.
+- **Prompt-injection framing.** Tool/RAG/sub-agent output is fenced off in the transcript
+  (`<<<OBSERVATION_START>>>...<<<OBSERVATION_END>>>`) with an explicit system-prompt instruction that
+  it's data to reason about, never new instructions to obey.
 
 ---
 
@@ -192,13 +224,20 @@ the run.
 Only valid while `status` is `AWAITING_APPROVAL` (409 Conflict otherwise). `reject` accepts an
 optional body: `{"reason": "..."}`.
 
+### `POST /agent/run/{runId}/cancel`
+
+Stops a `RUNNING`/`AWAITING_APPROVAL` run; idempotent (a no-op, not an error, once already
+terminal).
+
 ### `GET /agent/run/{runId}/files/{path}`
 
 Fetches one scratchpad file's full content (kept out of the main run payload since files can be
 large).
 
 All endpoints require a valid Keycloak-issued bearer token (any role in the `llm-gateway` realm —
-see Security below). Swagger UI: `http://localhost:8090/orchestrator/v1/swagger-ui.html`.
+see Security below) **and** require the caller be the run's creator or hold `ROLE_ADMIN` (403
+otherwise — see Operational safeguards above). Swagger UI:
+`http://localhost:8090/orchestrator/v1/swagger-ui.html`.
 
 ---
 
@@ -222,25 +261,29 @@ TOKEN=$(curl -s -X POST http://localhost:8081/realms/llm-gateway/protocol/openid
 
 ## Configuration
 
-| Property                                | Env var                       | Default                                                      |
-|------------------------------------------|--------------------------------|---------------------------------------------------------------|
-| `server.port`                            | `SERVER_PORT`                  | `8090`                                                         |
-| `spring.datasource.url`                  | `POSTGRES_HOST`/`POSTGRES_PORT`/`POSTGRES_DB` | `jdbc:postgresql://localhost:5432/spring_ai`     |
-| `spring.security.oauth2.resourceserver.jwt.issuer-uri` | `KEYCLOAK_ISSUER_URI` | `http://localhost:8081/realms/llm-gateway`             |
-| `gateway.base-url`                       | `GATEWAY_BASE_URL`             | `http://localhost:8080/llm/v1`                                 |
-| `rag.base-url`                           | `RAG_BASE_URL`                 | `http://localhost:8081/api/v1`                                 |
-| `platform.auth.client-secret`            | `PLATFORM_OAUTH_CLIENT_SECRET` | `llm-orchestrator-dev-secret`                                   |
-| `mcp.oauth2.client-secret`               | `MCP_OAUTH2_CLIENT_SECRET`     | `llm-orchestrator-secret`                                       |
-| `agent.max-iterations`                   | `AGENT_MAX_ITERATIONS`         | `25`                                                            |
-| `agent.sub-agent-max-iterations`         | `AGENT_SUBAGENT_MAX_ITERATIONS`| `6`                                                             |
-| `agent.step-timeout-seconds`             | `AGENT_STEP_TIMEOUT_SECONDS`   | `30`                                                            |
-| `agent.compaction-trigger-steps`         | `AGENT_COMPACTION_TRIGGER_STEPS` | `8`                                                           |
-| `agent.compaction-keep-recent-steps`     | `AGENT_COMPACTION_KEEP_RECENT_STEPS` | `4`                                                       |
-| `agent.approval-required-actions`        | `AGENT_APPROVAL_REQUIRED_ACTIONS` | `MCP_TOOL`                                                  |
-| `agent.session-history-limit`            | `AGENT_SESSION_HISTORY_LIMIT`  | `3`                                                             |
-| `agent.max-tasks`                        | `AGENT_MAX_TASKS`              | `50`                                                            |
-| `agent.max-scratchpad-files`             | `AGENT_MAX_SCRATCHPAD_FILES`   | `20`                                                            |
-| `agent.max-scratchpad-file-chars`        | `AGENT_MAX_SCRATCHPAD_FILE_CHARS` | `20000`                                                      |
+| Property                                               | Env var                                       | Default                                                        |
+|--------------------------------------------------------|-----------------------------------------------|----------------------------------------------------------------|
+| `server.port`                                          | `SERVER_PORT`                                 | `8090`                                                         |
+| `spring.datasource.url`                                | `POSTGRES_HOST`/`POSTGRES_PORT`/`POSTGRES_DB` | `jdbc:postgresql://localhost:5432/spring_ai`                   |
+| `spring.security.oauth2.resourceserver.jwt.issuer-uri` | `KEYCLOAK_ISSUER_URI`                         | `http://localhost:8081/realms/llm-gateway`                     |
+| `gateway.base-url`                                     | `GATEWAY_BASE_URL`                            | `http://localhost:8080/llm/v1`                                 |
+| `rag.base-url`                                         | `RAG_BASE_URL`                                | `http://localhost:8081/api/v1`                                 |
+| `platform.auth.client-secret`                          | `PLATFORM_OAUTH_CLIENT_SECRET`                | `llm-orchestrator-dev-secret`                                  |
+| `mcp.oauth2.client-secret`                             | `MCP_OAUTH2_CLIENT_SECRET`                    | `llm-orchestrator-secret`                                      |
+| `agent.max-iterations`                                 | `AGENT_MAX_ITERATIONS`                        | `25`                                                           |
+| `agent.sub-agent-max-iterations`                       | `AGENT_SUBAGENT_MAX_ITERATIONS`               | `6`                                                            |
+| `agent.step-timeout-seconds`                           | `AGENT_STEP_TIMEOUT_SECONDS`                  | `30`                                                           |
+| `agent.compaction-trigger-steps`                       | `AGENT_COMPACTION_TRIGGER_STEPS`              | `8`                                                            |
+| `agent.compaction-keep-recent-steps`                   | `AGENT_COMPACTION_KEEP_RECENT_STEPS`          | `4`                                                            |
+| `agent.approval-required-actions`                      | `AGENT_APPROVAL_REQUIRED_ACTIONS`             | (empty)                                                        |
+| `agent.approval-required-mcp-tools`                    | `AGENT_APPROVAL_REQUIRED_MCP_TOOLS`           | `*`                                                            |
+| `agent.max-total-tokens`                               | `AGENT_MAX_TOTAL_TOKENS`                      | `200000`                                                       |
+| `agent.retention-days`                                 | `AGENT_RETENTION_DAYS`                        | `30`                                                           |
+| `agent.retention-cron-schedule`                        | `AGENT_RETENTION_CRON_SCHEDULE`               | `0 0 3 * * *`                                                  |
+| `agent.session-history-limit`                          | `AGENT_SESSION_HISTORY_LIMIT`                 | `3`                                                            |
+| `agent.max-tasks`                                      | `AGENT_MAX_TASKS`                             | `50`                                                           |
+| `agent.max-scratchpad-files`                           | `AGENT_MAX_SCRATCHPAD_FILES`                  | `20`                                                           |
+| `agent.max-scratchpad-file-chars`                      | `AGENT_MAX_SCRATCHPAD_FILE_CHARS`             | `20000`                                                        |
 
 All `agent.*` numeric properties are validated at startup (`@Validated` + `@Min`) — a misconfigured
 value fails fast instead of misbehaving at runtime.
@@ -312,3 +355,11 @@ Spotless (`google-java-format`) must run under JDK 21, not 25 — `JAVA_HOME=<jd
 - **Scratchpad paths are flat strings**, not a real nested filesystem — `path` is an opaque key,
   not validated against directory-traversal semantics (there's nothing to traverse: it's one table,
   not a disk).
+- **Single-instance assumption.** `RunEventBroadcaster` (in-memory SSE fan-out) and
+  `AgentRunRecoveryRunner` (crash-recovery sweep) both assume exactly one instance of this service
+  runs against a given database; a multi-instance deployment would need a distributed lock for
+  recovery and a shared pub/sub backend (e.g. Redis) for SSE to work correctly.
+- **Prompt-injection framing is a mitigation, not a guarantee.** Delimiting tool/RAG output and
+  instructing the planner to treat it as data reduces the odds of injected instructions being
+  obeyed, but depends on the underlying model actually following that instruction — it isn't a hard
+  isolation boundary.

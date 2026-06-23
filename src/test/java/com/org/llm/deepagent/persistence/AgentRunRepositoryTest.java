@@ -103,8 +103,8 @@ class AgentRunRepositoryTest {
 
   @Test
   @DisplayName(
-      "markAwaitingApproval() then clearPendingAction() round-trips status and pending action")
-  void markAwaitingApprovalThenClear() {
+      "markAwaitingApproval() then claimPendingAction() round-trips status and pending action")
+  void markAwaitingApprovalThenClaim() {
     long runId = repository.createRun(null, "deploy it");
     PlannedAction pendingAction =
         new PlannedAction(AgentAction.MCP_TOOL, "deploy", "{}", "needs care");
@@ -115,11 +115,22 @@ class AgentRunRepositoryTest {
     assertThat(paused.status()).isEqualTo(AgentRunStatus.AWAITING_APPROVAL);
     assertThat(paused.pendingAction()).isEqualTo(pendingAction);
 
-    repository.clearPendingAction(runId);
+    assertThat(repository.claimPendingAction(runId)).isTrue();
     AgentRun resumed = repository.findById(runId);
 
     assertThat(resumed.status()).isEqualTo(AgentRunStatus.RUNNING);
     assertThat(resumed.pendingAction()).isNull();
+  }
+
+  @Test
+  @DisplayName("claimPendingAction() only succeeds once — a second claim on the same run fails")
+  void claimPendingActionOnlySucceedsOnce() {
+    long runId = repository.createRun(null, "deploy it");
+    repository.markAwaitingApproval(
+        runId, new PlannedAction(AgentAction.MCP_TOOL, "deploy", "{}", "r"));
+
+    assertThat(repository.claimPendingAction(runId)).isTrue();
+    assertThat(repository.claimPendingAction(runId)).isFalse();
   }
 
   @Test

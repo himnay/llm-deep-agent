@@ -1,7 +1,7 @@
 package com.org.llm.deepagent.agent;
 
 import jakarta.validation.constraints.Min;
-import java.util.EnumSet;
+import java.util.List;
 import java.util.Set;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -43,9 +43,34 @@ public class AgentProperties {
   private int compactionKeepRecentSteps = 4;
 
   /**
-   * Actions that pause the run with status AWAITING_APPROVAL until a human approves/rejects them.
+   * Non-MCP actions that pause the run with status AWAITING_APPROVAL until a human approves/rejects
+   * them. MCP_TOOL is deliberately excluded here — see {@link #approvalRequiredMcpTools} for
+   * per-tool (risk-aware) gating instead of gating every tool call uniformly.
    */
-  private Set<AgentAction> approvalRequiredActions = EnumSet.of(AgentAction.MCP_TOOL);
+  private Set<AgentAction> approvalRequiredActions = Set.of();
+
+  /**
+   * Which MCP tools require approval before a call is dispatched, matched against the planner's
+   * chosen {@code toolName}. Each entry is either an exact tool name or a {@code prefix*} pattern
+   * (e.g. {@code "deploy*"}); the default {@code "*"} gates every tool, matching this project's
+   * original (coarser) behavior — narrow it to just the mutating tools once you know your
+   * catalogue.
+   */
+  private List<String> approvalRequiredMcpTools = List.of("*");
+
+  /**
+   * Hard cap on cumulative prompt+completion tokens a run may spend before it's stopped as
+   * INCOMPLETE.
+   */
+  @Min(1)
+  private int maxTotalTokens = 200_000;
+
+  /**
+   * How long a terminal (non-running) top-level run is kept before {@code AgentRunRetentionJob}
+   * prunes it.
+   */
+  @Min(1)
+  private int retentionDays = 30;
 
   /**
    * How many prior runs for the same sessionId are summarized into a new top-level run's first
@@ -65,4 +90,28 @@ public class AgentProperties {
   /** Max characters allowed in a single scratchpad file's content. */
   @Min(1)
   private int maxScratchpadFileChars = 20_000;
+
+  /**
+   * Whether a planned action should pause for human approval: non-MCP actions are gated by {@link
+   * #approvalRequiredActions}; MCP_TOOL calls are instead gated per-tool by {@link
+   * #approvalRequiredMcpTools} (exact match or a {@code prefix*} pattern), independent of whatever
+   * {@link #approvalRequiredActions} contains.
+   */
+  public boolean isApprovalRequired(AgentAction action, String toolName) {
+    if (action != AgentAction.MCP_TOOL) {
+      return approvalRequiredActions.contains(action);
+    }
+    String name = toolName == null ? "" : toolName;
+    return approvalRequiredMcpTools.stream().anyMatch(pattern -> matchesToolPattern(pattern, name));
+  }
+
+  private static boolean matchesToolPattern(String pattern, String toolName) {
+    if (pattern.equals("*")) {
+      return true;
+    }
+    if (pattern.endsWith("*")) {
+      return toolName.startsWith(pattern.substring(0, pattern.length() - 1));
+    }
+    return pattern.equals(toolName);
+  }
 }

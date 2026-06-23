@@ -85,4 +85,41 @@ class TaskPlanningRoutingStrategyTest {
     verify(agentTaskRepository, never())
         .replaceAll(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
   }
+
+  @Test
+  @DisplayName(
+      "execute() rejects a task list with duplicate taskKeys instead of letting the DB constraint crash the run")
+  void executeRejectsDuplicateTaskKeys() {
+    String input =
+        "[{\"taskKey\":\"t1\",\"description\":\"a\",\"status\":\"PENDING\"},"
+            + "{\"taskKey\":\"t1\",\"description\":\"b\",\"status\":\"PENDING\"}]";
+
+    StepResult result =
+        strategy.execute(
+            new AgentContext(1L, 9L, null, false),
+            new PlannedAction(AgentAction.PLAN_TASKS, null, input, null));
+
+    assertThat(result.success()).isFalse();
+    assertThat(result.observation()).contains("duplicate taskKey");
+    verify(agentTaskRepository, never())
+        .replaceAll(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any());
+  }
+
+  @Test
+  @DisplayName(
+      "execute() surfaces a DB constraint violation as a recoverable error instead of throwing")
+  void executeSurfacesDataIntegrityViolationGracefully() {
+    String input = "[{\"taskKey\":\"t1\",\"description\":\"a\",\"status\":\"PENDING\"}]";
+    org.mockito.Mockito.doThrow(new org.springframework.dao.DataIntegrityViolationException("boom"))
+        .when(agentTaskRepository)
+        .replaceAll(org.mockito.ArgumentMatchers.eq(9L), org.mockito.ArgumentMatchers.any());
+
+    StepResult result =
+        strategy.execute(
+            new AgentContext(1L, 9L, null, false),
+            new PlannedAction(AgentAction.PLAN_TASKS, null, input, null));
+
+    assertThat(result.success()).isFalse();
+    assertThat(result.observation()).contains("unique");
+  }
 }

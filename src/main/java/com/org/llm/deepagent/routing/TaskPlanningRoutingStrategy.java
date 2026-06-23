@@ -10,8 +10,10 @@ import com.org.llm.deepagent.agent.PlannedAction;
 import com.org.llm.deepagent.persistence.AgentTaskRepository;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
 /**
@@ -54,6 +56,14 @@ public class TaskPlanningRoutingStrategy implements RoutingStrategy {
               + ". Trim the list and try again.");
     }
 
+    long distinctKeys = parsed.stream().map(PlannedTaskInput::taskKey).distinct().count();
+    if (distinctKeys < parsed.size()) {
+      return StepResult.error(
+          "Task list has duplicate taskKey values: "
+              + parsed.stream().map(PlannedTaskInput::taskKey).collect(Collectors.joining(", "))
+              + ". Each taskKey must be unique within the list.");
+    }
+
     List<AgentTask> tasks =
         parsed.stream()
             .map(
@@ -61,7 +71,13 @@ public class TaskPlanningRoutingStrategy implements RoutingStrategy {
                     new AgentTask(
                         null, context.rootRunId(), t.taskKey(), t.description(), t.status(), null))
             .toList();
-    agentTaskRepository.replaceAll(context.rootRunId(), tasks);
+    try {
+      agentTaskRepository.replaceAll(context.rootRunId(), tasks);
+    } catch (DataIntegrityViolationException e) {
+      log.warn("TASK_PLANNING | replaceAll rejected by the database | {}", e.getMessage());
+      return StepResult.error(
+          "Could not save the task list — each taskKey must be unique. Try again with distinct keys.");
+    }
 
     return StepResult.ok("Task list updated (" + tasks.size() + " tasks).");
   }

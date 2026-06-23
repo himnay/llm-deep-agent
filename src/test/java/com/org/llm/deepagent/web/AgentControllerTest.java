@@ -25,6 +25,7 @@ import com.org.llm.deepagent.web.dto.AgentRunRequest;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +35,10 @@ import org.springframework.boot.security.oauth2.server.resource.autoconfigure.OA
 import org.springframework.boot.security.oauth2.server.resource.autoconfigure.web.OAuth2ResourceServerWebSecurityAutoConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -56,11 +61,18 @@ class AgentControllerTest {
   @MockitoBean private AgentArtifactRepository agentArtifactRepository;
   @MockitoBean private RunEventBroadcaster runEventBroadcaster;
 
+  @AfterEach
+  void clearSecurityContext() {
+    // Security auto-config is excluded from this slice, so nothing else resets the ThreadLocal
+    // SecurityContext between tests that set one explicitly (the ownership tests below).
+    SecurityContextHolder.clearContext();
+  }
+
   @Test
   @DisplayName("POST /agent/run starts the run and returns 200 with status RUNNING")
   void runStartsAsynchronouslyAndReturnsRunning() throws Exception {
     AgentRun run = runOf(7L, "s1", "hi", AgentRunStatus.RUNNING, null, List.of());
-    when(agentLoopExecutor.startRun(eq("hi"), eq("s1"))).thenReturn(run);
+    when(agentLoopExecutor.startRun(eq("hi"), eq("s1"), any())).thenReturn(run);
 
     mockMvc
         .perform(
@@ -106,9 +118,29 @@ class AgentControllerTest {
   }
 
   @Test
+  @DisplayName("GET /agent/run/{id} returns 403 when the caller isn't the run's creator")
+  void getRunReturns403ForNonOwner() throws Exception {
+    AgentRun run = ownedRunOf(7L, "owner-1");
+    when(agentRunRepository.findById(7L)).thenReturn(run);
+    authenticateAs("someone-else");
+
+    mockMvc.perform(get("/agent/run/7")).andExpect(status().isForbidden());
+  }
+
+  @Test
+  @DisplayName("GET /agent/run/{id} allows ROLE_ADMIN to access a run it doesn't own")
+  void getRunAllowsAdminRegardlessOfOwnership() throws Exception {
+    AgentRun run = ownedRunOf(7L, "owner-1");
+    when(agentRunRepository.findById(7L)).thenReturn(run);
+    authenticateAs("someone-else", new SimpleGrantedAuthority("ROLE_ADMIN"));
+
+    mockMvc.perform(get("/agent/run/7")).andExpect(status().isOk());
+  }
+
+  @Test
   @DisplayName("An unexpected exception from the loop executor returns 500")
   void runThrowingReturns500() throws Exception {
-    when(agentLoopExecutor.startRun(any(), any())).thenThrow(new RuntimeException("boom"));
+    when(agentLoopExecutor.startRun(any(), any(), any())).thenThrow(new RuntimeException("boom"));
 
     mockMvc
         .perform(
@@ -122,7 +154,8 @@ class AgentControllerTest {
   @DisplayName("POST /agent/run/{id}/approve dispatches and returns the resumed run")
   void approveResumesRun() throws Exception {
     AgentRun run = runOf(7L, "s1", "hi", AgentRunStatus.RUNNING, null, List.of());
-    when(agentLoopExecutor.approve(7L)).thenReturn(run);
+    when(agentRunRepository.findById(7L)).thenReturn(run);
+    when(agentLoopExecutor.approve(eq(7L), any())).thenReturn(run);
 
     mockMvc
         .perform(post("/agent/run/7/approve"))
@@ -133,7 +166,9 @@ class AgentControllerTest {
   @Test
   @DisplayName("POST /agent/run/{id}/approve on a run that isn't awaiting approval returns 409")
   void approveOnWrongStateReturns409() throws Exception {
-    when(agentLoopExecutor.approve(7L))
+    AgentRun run = runOf(7L, "s1", "hi", AgentRunStatus.RUNNING, null, List.of());
+    when(agentRunRepository.findById(7L)).thenReturn(run);
+    when(agentLoopExecutor.approve(eq(7L), any()))
         .thenThrow(new InvalidRunStateException("not awaiting approval"));
 
     mockMvc.perform(post("/agent/run/7/approve")).andExpect(status().isConflict());
@@ -143,7 +178,8 @@ class AgentControllerTest {
   @DisplayName("POST /agent/run/{id}/reject feeds the reason back and returns the resumed run")
   void rejectResumesRun() throws Exception {
     AgentRun run = runOf(7L, "s1", "hi", AgentRunStatus.RUNNING, null, List.of());
-    when(agentLoopExecutor.reject(eq(7L), eq("too risky"))).thenReturn(run);
+    when(agentRunRepository.findById(7L)).thenReturn(run);
+    when(agentLoopExecutor.reject(eq(7L), any(), eq("too risky"))).thenReturn(run);
 
     mockMvc
         .perform(
@@ -152,6 +188,20 @@ class AgentControllerTest {
                 .content("{\"reason\":\"too risky\"}"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value("RUNNING"));
+  }
+
+  @Test
+  @DisplayName("POST /agent/run/{id}/cancel returns the cancelled run")
+  void cancelReturnsCancelledRun() throws Exception {
+    AgentRun run = runOf(7L, "s1", "hi", AgentRunStatus.RUNNING, null, List.of());
+    AgentRun cancelled = runOf(7L, "s1", "hi", AgentRunStatus.CANCELLED, null, List.of());
+    when(agentRunRepository.findById(7L)).thenReturn(run);
+    when(agentLoopExecutor.cancel(7L)).thenReturn(cancelled);
+
+    mockMvc
+        .perform(post("/agent/run/7/cancel"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("CANCELLED"));
   }
 
   @Test
@@ -188,6 +238,31 @@ class AgentControllerTest {
     mockMvc.perform(get("/agent/run/99/events")).andExpect(status().isNotFound());
   }
 
+  private static void authenticateAs(String principal, GrantedAuthority... authorities) {
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            new UsernamePasswordAuthenticationToken(principal, null, List.of(authorities)));
+  }
+
+  private static AgentRun ownedRunOf(long id, String createdBy) {
+    return new AgentRun(
+        id,
+        "s1",
+        "hi",
+        AgentRunStatus.RUNNING,
+        null,
+        List.of(),
+        Instant.now(),
+        null,
+        null,
+        id,
+        null,
+        0,
+        null,
+        createdBy,
+        0);
+  }
+
   private static AgentRun runOf(
       long id,
       String sessionId,
@@ -208,6 +283,8 @@ class AgentControllerTest {
         id,
         null,
         0,
-        null);
+        null,
+        null,
+        0);
   }
 }
