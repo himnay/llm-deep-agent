@@ -1,4 +1,4 @@
-package com.org.llm.orchestrator.client;
+package com.org.llm.deepagent.client;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;

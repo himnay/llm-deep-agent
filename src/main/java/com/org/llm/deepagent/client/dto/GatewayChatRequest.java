@@ -1,4 +1,4 @@
-package com.org.llm.orchestrator.client.dto;
+package com.org.llm.deepagent.client.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;

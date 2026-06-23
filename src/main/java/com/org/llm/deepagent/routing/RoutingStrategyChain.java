@@ -1,6 +1,6 @@
-package com.org.llm.orchestrator.routing;
+package com.org.llm.deepagent.routing;
 
-import com.org.llm.orchestrator.agent.PlannedAction;
+import com.org.llm.deepagent.agent.PlannedAction;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

@@ -1,4 +1,4 @@
-package com.org.llm.orchestrator.exception;
+package com.org.llm.deepagent.exception;
 
 /**
  * Thrown when an MCP tool invocation fails after retries/circuit-breaker handling have been

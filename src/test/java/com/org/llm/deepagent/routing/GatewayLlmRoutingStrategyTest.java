@@ -1,13 +1,13 @@
-package com.org.llm.orchestrator.routing;
+package com.org.llm.deepagent.routing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.org.llm.orchestrator.agent.AgentAction;
-import com.org.llm.orchestrator.agent.PlannedAction;
-import com.org.llm.orchestrator.client.GatewayClient;
-import com.org.llm.orchestrator.client.dto.GatewayChatResponse;
+import com.org.llm.deepagent.agent.AgentAction;
+import com.org.llm.deepagent.agent.PlannedAction;
+import com.org.llm.deepagent.client.GatewayClient;
+import com.org.llm.deepagent.client.dto.GatewayChatResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -33,7 +33,7 @@ class GatewayLlmRoutingStrategyTest {
 
     StepResult result =
         strategy.execute(
-            new AgentContext(1L, "session-1"),
+            new AgentContext(1L, 1L, "session-1", false),
             new PlannedAction(AgentAction.GATEWAY_LLM, null, "hello", "just chat"));
 
     assertThat(result.success()).isTrue();
@@ -50,7 +50,7 @@ class GatewayLlmRoutingStrategyTest {
 
     StepResult result =
         strategy.execute(
-            new AgentContext(1L, null),
+            new AgentContext(1L, 1L, null, false),
             new PlannedAction(AgentAction.GATEWAY_LLM, null, "hello", null));
 
     assertThat(result.success()).isFalse();

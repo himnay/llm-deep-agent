@@ -1,8 +1,8 @@
-package com.org.llm.orchestrator.client;
+package com.org.llm.deepagent.client;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.org.llm.orchestrator.exception.TokenAcquisitionException;
+import com.org.llm.deepagent.exception.TokenAcquisitionException;
 import java.time.Instant;
 import java.util.concurrent.locks.ReentrantLock;
 import lombok.extern.slf4j.Slf4j;
@@ -25,7 +25,8 @@ public class PlatformTokenService {
   private final RestClient restClient;
   private final ReentrantLock lock = new ReentrantLock();
 
-  public PlatformTokenService(RestClient.Builder restClientBuilder, PlatformAuthProperties properties) {
+  public PlatformTokenService(
+      RestClient.Builder restClientBuilder, PlatformAuthProperties properties) {
     this.properties = properties;
     this.restClient = restClientBuilder.build();
   }

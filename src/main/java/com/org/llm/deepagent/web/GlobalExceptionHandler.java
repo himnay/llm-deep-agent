@@ -1,8 +1,10 @@
-package com.org.llm.orchestrator.web;
+package com.org.llm.deepagent.web;
 
-import com.org.llm.orchestrator.exception.AgentRunNotFoundException;
-import com.org.llm.orchestrator.exception.McpToolCallException;
-import com.org.llm.orchestrator.exception.TokenAcquisitionException;
+import com.org.llm.deepagent.exception.AgentArtifactNotFoundException;
+import com.org.llm.deepagent.exception.AgentRunNotFoundException;
+import com.org.llm.deepagent.exception.InvalidRunStateException;
+import com.org.llm.deepagent.exception.McpToolCallException;
+import com.org.llm.deepagent.exception.TokenAcquisitionException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+  /** Maps a {@code @Valid} request-body failure to 400, with one field error per violation. */
   @ExceptionHandler(MethodArgumentNotValidException.class)
   public ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException ex) {
     Map<String, String> fieldErrors = new LinkedHashMap<>();
@@ -32,12 +35,23 @@ public class GlobalExceptionHandler {
                 fieldErrors));
   }
 
-  @ExceptionHandler(AgentRunNotFoundException.class)
-  public ResponseEntity<ApiError> handleNotFound(AgentRunNotFoundException ex) {
+  /** Maps a lookup of a non-existent run id or scratchpad file to 404. */
+  @ExceptionHandler({AgentRunNotFoundException.class, AgentArtifactNotFoundException.class})
+  public ResponseEntity<ApiError> handleNotFound(RuntimeException ex) {
     return ResponseEntity.status(HttpStatus.NOT_FOUND)
         .body(ApiError.of(HttpStatus.NOT_FOUND.value(), "Not found", ex.getMessage()));
   }
 
+  /**
+   * Maps a state-precondition violation (e.g. approving a run that isn't awaiting approval) to 409.
+   */
+  @ExceptionHandler(InvalidRunStateException.class)
+  public ResponseEntity<ApiError> handleInvalidRunState(InvalidRunStateException ex) {
+    return ResponseEntity.status(HttpStatus.CONFLICT)
+        .body(ApiError.of(HttpStatus.CONFLICT.value(), "Invalid run state", ex.getMessage()));
+  }
+
+  /** Maps a downstream/upstream dependency failure (MCP tool call, token acquisition) to 502. */
   @ExceptionHandler({McpToolCallException.class, TokenAcquisitionException.class})
   public ResponseEntity<ApiError> handleUpstreamFailure(RuntimeException ex) {
     log.error("ORCHESTRATOR | upstream dependency failure | {}", ex.getMessage(), ex);
@@ -47,6 +61,7 @@ public class GlobalExceptionHandler {
                 HttpStatus.BAD_GATEWAY.value(), "Upstream dependency failed", ex.getMessage()));
   }
 
+  /** Catch-all fallback for anything not handled above; maps to 500. */
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ApiError> handleGeneric(Exception ex) {
     log.error("ORCHESTRATOR | unhandled error | {}", ex.getMessage(), ex);

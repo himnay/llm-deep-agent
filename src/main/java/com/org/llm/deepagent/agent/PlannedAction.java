@@ -1,4 +1,4 @@
-package com.org.llm.orchestrator.agent;
+package com.org.llm.deepagent.agent;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 

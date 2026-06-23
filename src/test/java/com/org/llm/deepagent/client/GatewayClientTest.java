@@ -1,4 +1,4 @@
-package com.org.llm.orchestrator.client;
+package com.org.llm.deepagent.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -55,8 +55,7 @@ class GatewayClientTest {
     server
         .expect(requestTo("http://gateway.test/llm/v1/query"))
         .andExpect(method(HttpMethod.POST))
-        .andRespond(
-            withSuccess("{\"content\":\"planned action\"}", MediaType.APPLICATION_JSON));
+        .andRespond(withSuccess("{\"content\":\"planned action\"}", MediaType.APPLICATION_JSON));
 
     GatewayClient client = new GatewayClient(builder, properties, tokenService);
     var response = client.query("what next?", "system prompt");

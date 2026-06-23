@@ -1,4 +1,4 @@
-package com.org.llm.orchestrator.routing;
+package com.org.llm.deepagent.routing;
 
 /** The observation fed back to the planner LLM after a {@link RoutingStrategy} runs. */
 public record StepResult(String observation, boolean success) {

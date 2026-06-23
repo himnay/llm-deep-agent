@@ -1,6 +1,6 @@
-package com.org.llm.orchestrator.mcp;
+package com.org.llm.deepagent.mcp;
 
-import com.org.llm.orchestrator.exception.McpToolCallException;
+import com.org.llm.deepagent.exception.McpToolCallException;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;

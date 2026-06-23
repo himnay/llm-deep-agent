@@ -1,7 +1,7 @@
-package com.org.llm.orchestrator.client;
+package com.org.llm.deepagent.client;
 
-import com.org.llm.orchestrator.client.dto.GatewayChatRequest;
-import com.org.llm.orchestrator.client.dto.GatewayChatResponse;
+import com.org.llm.deepagent.client.dto.GatewayChatRequest;
+import com.org.llm.deepagent.client.dto.GatewayChatResponse;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import java.time.Duration;
@@ -23,7 +23,9 @@ public class GatewayClient {
   private final RestClient restClient;
 
   public GatewayClient(
-      RestClient.Builder restClientBuilder, GatewayProperties properties, PlatformTokenService tokenService) {
+      RestClient.Builder restClientBuilder,
+      GatewayProperties properties,
+      PlatformTokenService tokenService) {
     this.properties = properties;
     this.tokenService = tokenService;
     this.restClient = restClientBuilder.baseUrl(properties.getBaseUrl()).build();

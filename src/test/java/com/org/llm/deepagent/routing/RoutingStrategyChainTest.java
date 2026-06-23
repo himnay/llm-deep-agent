@@ -1,11 +1,11 @@
-package com.org.llm.orchestrator.routing;
+package com.org.llm.deepagent.routing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.org.llm.orchestrator.agent.AgentAction;
-import com.org.llm.orchestrator.agent.PlannedAction;
+import com.org.llm.deepagent.agent.AgentAction;
+import com.org.llm.deepagent.agent.PlannedAction;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,7 +28,7 @@ class RoutingStrategyChainTest {
 
     StepResult result =
         chain.dispatch(
-            new AgentContext(1L, null),
+            new AgentContext(1L, 1L, null, false),
             new PlannedAction(AgentAction.GATEWAY_LLM, null, "hi", null));
 
     assertThat(result.success()).isTrue();
@@ -42,7 +42,8 @@ class RoutingStrategyChainTest {
 
     StepResult result =
         chain.dispatch(
-            new AgentContext(1L, null), new PlannedAction(AgentAction.MCP_TOOL, "x", "{}", null));
+            new AgentContext(1L, 1L, null, false),
+            new PlannedAction(AgentAction.MCP_TOOL, "x", "{}", null));
 
     assertThat(result.success()).isFalse();
     assertThat(result.observation()).contains("No routing strategy registered");

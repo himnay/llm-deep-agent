@@ -112,8 +112,16 @@ gateway-auth:
     allowed-origins: ${GATEWAY_CORS_ORIGINS:http://localhost:3000,http://localhost:8080}
 
 agent:
-  max-iterations: ${AGENT_MAX_ITERATIONS:6}
+  max-iterations: ${AGENT_MAX_ITERATIONS:25}
+  sub-agent-max-iterations: ${AGENT_SUBAGENT_MAX_ITERATIONS:6}
   step-timeout-seconds: ${AGENT_STEP_TIMEOUT_SECONDS:30}
+  compaction-trigger-steps: ${AGENT_COMPACTION_TRIGGER_STEPS:8}
+  compaction-keep-recent-steps: ${AGENT_COMPACTION_KEEP_RECENT_STEPS:4}
+  approval-required-actions: ${AGENT_APPROVAL_REQUIRED_ACTIONS:MCP_TOOL}
+  session-history-limit: ${AGENT_SESSION_HISTORY_LIMIT:3}
+  max-tasks: ${AGENT_MAX_TASKS:50}
+  max-scratchpad-files: ${AGENT_MAX_SCRATCHPAD_FILES:20}
+  max-scratchpad-file-chars: ${AGENT_MAX_SCRATCHPAD_FILE_CHARS:20000}
 
 resilience4j:
   circuitbreaker:

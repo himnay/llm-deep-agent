@@ -1,9 +1,9 @@
-package com.org.llm.orchestrator.routing;
+package com.org.llm.deepagent.routing;
 
-import com.org.llm.orchestrator.agent.AgentAction;
-import com.org.llm.orchestrator.agent.PlannedAction;
-import com.org.llm.orchestrator.client.GatewayClient;
-import com.org.llm.orchestrator.client.dto.GatewayChatResponse;
+import com.org.llm.deepagent.agent.AgentAction;
+import com.org.llm.deepagent.agent.PlannedAction;
+import com.org.llm.deepagent.client.GatewayClient;
+import com.org.llm.deepagent.client.dto.GatewayChatResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

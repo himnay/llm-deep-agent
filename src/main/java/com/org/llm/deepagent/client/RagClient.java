@@ -1,9 +1,9 @@
-package com.org.llm.orchestrator.client;
+package com.org.llm.deepagent.client;
 
-import com.org.llm.orchestrator.client.dto.RagGenerateRequest;
-import com.org.llm.orchestrator.client.dto.RagGenerateResponse;
-import com.org.llm.orchestrator.client.dto.RagRetrievalResult;
-import com.org.llm.orchestrator.client.dto.RagRetrieveRequest;
+import com.org.llm.deepagent.client.dto.RagGenerateRequest;
+import com.org.llm.deepagent.client.dto.RagGenerateResponse;
+import com.org.llm.deepagent.client.dto.RagRetrievalResult;
+import com.org.llm.deepagent.client.dto.RagRetrieveRequest;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +24,9 @@ public class RagClient {
   private final RestClient restClient;
 
   public RagClient(
-      RestClient.Builder restClientBuilder, RagProperties properties, PlatformTokenService tokenService) {
+      RestClient.Builder restClientBuilder,
+      RagProperties properties,
+      PlatformTokenService tokenService) {
     this.properties = properties;
     this.tokenService = tokenService;
     this.restClient = restClientBuilder.baseUrl(properties.getBaseUrl()).build();

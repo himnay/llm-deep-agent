@@ -1,4 +1,4 @@
-package com.org.llm.orchestrator.config;
+package com.org.llm.deepagent.config;
 
 import io.github.mweirauch.micrometer.jvm.extras.ProcessMemoryMetrics;
 import io.github.mweirauch.micrometer.jvm.extras.ProcessThreadMetrics;

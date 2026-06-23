@@ -1,15 +1,15 @@
-package com.org.llm.orchestrator.routing;
+package com.org.llm.deepagent.routing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.org.llm.orchestrator.agent.AgentAction;
-import com.org.llm.orchestrator.agent.PlannedAction;
-import com.org.llm.orchestrator.client.RagClient;
-import com.org.llm.orchestrator.client.dto.RagGenerateResponse;
-import com.org.llm.orchestrator.client.dto.RagRetrievalResult;
+import com.org.llm.deepagent.agent.AgentAction;
+import com.org.llm.deepagent.agent.PlannedAction;
+import com.org.llm.deepagent.client.RagClient;
+import com.org.llm.deepagent.client.dto.RagGenerateResponse;
+import com.org.llm.deepagent.client.dto.RagRetrievalResult;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -35,7 +35,7 @@ class RagRoutingStrategyTest {
 
     StepResult result =
         strategy.execute(
-            new AgentContext(1L, "s1"),
+            new AgentContext(1L, 1L, "s1", false),
             new PlannedAction(AgentAction.RAG_RETRIEVE, null, "leave policy", null));
 
     assertThat(result.success()).isTrue();
@@ -50,7 +50,7 @@ class RagRoutingStrategyTest {
 
     StepResult result =
         strategy.execute(
-            new AgentContext(1L, "s1"),
+            new AgentContext(1L, 1L, "s1", false),
             new PlannedAction(AgentAction.RAG_GENERATE, null, "what is the leave policy?", null));
 
     assertThat(result.success()).isTrue();
@@ -65,7 +65,7 @@ class RagRoutingStrategyTest {
 
     StepResult result =
         strategy.execute(
-            new AgentContext(1L, null),
+            new AgentContext(1L, 1L, null, false),
             new PlannedAction(AgentAction.RAG_GENERATE, null, "unknown topic", null));
 
     assertThat(result.success()).isTrue();

@@ -1,4 +1,4 @@
-package com.org.llm.orchestrator.exception;
+package com.org.llm.deepagent.exception;
 
 /** Thrown when {@code GET /agent/run/{runId}} is called with an id that doesn't exist. */
 public class AgentRunNotFoundException extends RuntimeException {

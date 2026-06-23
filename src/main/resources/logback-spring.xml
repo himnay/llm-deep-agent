@@ -34,7 +34,7 @@
     <root level="INFO">
         <appender-ref ref="ASYNC_CONSOLE"/>
     </root>
-    <logger name="com.org.llm.orchestrator" level="DEBUG" additivity="false">
+    <logger name="com.org.llm.deepagent" level="DEBUG" additivity="false">
         <appender-ref ref="ASYNC_CONSOLE"/>
     </logger>
     <logger name="org.springframework.ai" level="INFO"/>

@@ -1,4 +1,6 @@
-package com.org.llm.orchestrator;
+package com.org.llm.deepagent;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -7,8 +9,6 @@ import org.springframework.context.ApplicationContext;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Full application-context smoke test. The MCP connections in {@code application.yaml} point at
@@ -19,8 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 class LlmOrchestratorApplicationTests {
 
-  @Container
-  @ServiceConnection
+  @Container @ServiceConnection
   static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18");
 
   @Test

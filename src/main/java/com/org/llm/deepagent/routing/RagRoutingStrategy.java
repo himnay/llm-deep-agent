@@ -1,11 +1,11 @@
-package com.org.llm.orchestrator.routing;
+package com.org.llm.deepagent.routing;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.org.llm.orchestrator.agent.AgentAction;
-import com.org.llm.orchestrator.agent.PlannedAction;
-import com.org.llm.orchestrator.client.RagClient;
-import com.org.llm.orchestrator.client.dto.RagGenerateResponse;
-import com.org.llm.orchestrator.client.dto.RagRetrievalResult;
+import com.org.llm.deepagent.agent.AgentAction;
+import com.org.llm.deepagent.agent.PlannedAction;
+import com.org.llm.deepagent.client.RagClient;
+import com.org.llm.deepagent.client.dto.RagGenerateResponse;
+import com.org.llm.deepagent.client.dto.RagRetrievalResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

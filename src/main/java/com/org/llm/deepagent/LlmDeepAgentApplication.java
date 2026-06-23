@@ -1,4 +1,4 @@
-package com.org.llm.orchestrator;
+package com.org.llm.deepagent;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -6,9 +6,9 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
 @SpringBootApplication
 @ConfigurationPropertiesScan
-public class LlmOrchestratorApplication {
+public class LlmDeepAgentApplication {
 
   static void main(String[] args) {
-    SpringApplication.run(LlmOrchestratorApplication.class, args);
+    SpringApplication.run(LlmDeepAgentApplication.class, args);
   }
 }

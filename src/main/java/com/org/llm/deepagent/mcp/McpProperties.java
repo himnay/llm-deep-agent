@@ -1,4 +1,4 @@
-package com.org.llm.orchestrator.mcp;
+package com.org.llm.deepagent.mcp;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;

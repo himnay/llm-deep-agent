@@ -1,4 +1,4 @@
-package com.org.llm.orchestrator.client;
+package com.org.llm.deepagent.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;

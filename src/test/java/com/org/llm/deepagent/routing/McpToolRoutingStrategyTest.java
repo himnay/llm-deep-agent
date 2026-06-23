@@ -1,11 +1,11 @@
-package com.org.llm.orchestrator.routing;
+package com.org.llm.deepagent.routing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.org.llm.orchestrator.agent.AgentAction;
-import com.org.llm.orchestrator.agent.PlannedAction;
+import com.org.llm.deepagent.agent.AgentAction;
+import com.org.llm.deepagent.agent.PlannedAction;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.tool.ToolCallback;
@@ -31,7 +31,8 @@ class McpToolRoutingStrategyTest {
 
     StepResult result =
         strategy.execute(
-            new AgentContext(1L, null), new PlannedAction(AgentAction.MCP_TOOL, null, "{}", null));
+            new AgentContext(1L, 1L, null, false),
+            new PlannedAction(AgentAction.MCP_TOOL, null, "{}", null));
 
     assertThat(result.success()).isFalse();
     assertThat(result.observation()).contains("requires a toolName");
@@ -44,7 +45,7 @@ class McpToolRoutingStrategyTest {
 
     StepResult result =
         strategy.execute(
-            new AgentContext(1L, null),
+            new AgentContext(1L, 1L, null, false),
             new PlannedAction(AgentAction.MCP_TOOL, "getDeployments", "{}", null));
 
     assertThat(result.success()).isFalse();
@@ -63,7 +64,7 @@ class McpToolRoutingStrategyTest {
 
     StepResult result =
         strategy.execute(
-            new AgentContext(1L, null),
+            new AgentContext(1L, 1L, null, false),
             new PlannedAction(AgentAction.MCP_TOOL, "getDeployments", "{\"id\":1}", null));
 
     assertThat(result.success()).isTrue();
@@ -82,7 +83,7 @@ class McpToolRoutingStrategyTest {
 
     StepResult result =
         strategy.execute(
-            new AgentContext(1L, null),
+            new AgentContext(1L, 1L, null, false),
             new PlannedAction(AgentAction.MCP_TOOL, "getDeployments", "{}", null));
 
     assertThat(result.success()).isFalse();

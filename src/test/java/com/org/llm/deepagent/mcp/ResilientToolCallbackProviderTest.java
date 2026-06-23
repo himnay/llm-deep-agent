@@ -1,11 +1,11 @@
-package com.org.llm.orchestrator.mcp;
+package com.org.llm.deepagent.mcp;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.org.llm.orchestrator.exception.McpToolCallException;
+import com.org.llm.deepagent.exception.McpToolCallException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
@@ -24,7 +24,8 @@ class ResilientToolCallbackProviderTest {
       CircuitBreakerRegistry.of(
           CircuitBreakerConfig.custom().slidingWindowSize(2).failureRateThreshold(50).build());
   private final RetryRegistry retryRegistry =
-      RetryRegistry.of(RetryConfig.custom().maxAttempts(1).waitDuration(Duration.ofMillis(1)).build());
+      RetryRegistry.of(
+          RetryConfig.custom().maxAttempts(1).waitDuration(Duration.ofMillis(1)).build());
 
   private ToolCallback toolNamed(String name) {
     ToolCallback callback = mock(ToolCallback.class);
@@ -42,7 +43,11 @@ class ResilientToolCallbackProviderTest {
 
     ResilientToolCallbackProvider provider =
         new ResilientToolCallbackProvider(
-            delegate, circuitBreakerRegistry, retryRegistry, 5, Map.of("getDeployments", "deployment"));
+            delegate,
+            circuitBreakerRegistry,
+            retryRegistry,
+            5,
+            Map.of("getDeployments", "deployment"));
 
     ToolCallback[] wrapped = provider.getToolCallbacks();
 
@@ -59,7 +64,11 @@ class ResilientToolCallbackProviderTest {
 
     ResilientToolCallbackProvider provider =
         new ResilientToolCallbackProvider(
-            delegate, circuitBreakerRegistry, retryRegistry, 5, Map.of("getDeployments", "deployment"));
+            delegate,
+            circuitBreakerRegistry,
+            retryRegistry,
+            5,
+            Map.of("getDeployments", "deployment"));
 
     String result = provider.getToolCallbacks()[0].call("{}");
 
@@ -75,7 +84,11 @@ class ResilientToolCallbackProviderTest {
 
     ResilientToolCallbackProvider provider =
         new ResilientToolCallbackProvider(
-            delegate, circuitBreakerRegistry, retryRegistry, 5, Map.of("getDeployments", "deployment"));
+            delegate,
+            circuitBreakerRegistry,
+            retryRegistry,
+            5,
+            Map.of("getDeployments", "deployment"));
 
     assertThatThrownBy(() -> provider.getToolCallbacks()[0].call("{}"))
         .isInstanceOf(McpToolCallException.class)
@@ -91,7 +104,11 @@ class ResilientToolCallbackProviderTest {
 
     ResilientToolCallbackProvider provider =
         new ResilientToolCallbackProvider(
-            delegate, circuitBreakerRegistry, retryRegistry, 5, Map.of("getDeployments", "deployment"));
+            delegate,
+            circuitBreakerRegistry,
+            retryRegistry,
+            5,
+            Map.of("getDeployments", "deployment"));
     ToolCallback wrapped = provider.getToolCallbacks()[0];
 
     // Force the circuit open by recording enough failures directly against the breaker.
@@ -110,7 +127,8 @@ class ResilientToolCallbackProviderTest {
     when(delegate.getToolCallbacks()).thenReturn(new ToolCallback[] {raw});
 
     ResilientToolCallbackProvider provider =
-        new ResilientToolCallbackProvider(delegate, circuitBreakerRegistry, retryRegistry, 5, Map.of());
+        new ResilientToolCallbackProvider(
+            delegate, circuitBreakerRegistry, retryRegistry, 5, Map.of());
 
     provider.getToolCallbacks();
 
@@ -127,7 +145,11 @@ class ResilientToolCallbackProviderTest {
 
     ResilientToolCallbackProvider provider =
         new ResilientToolCallbackProvider(
-            delegate, circuitBreakerRegistry, retryRegistry, 5, Map.of("getDeployments", "deployment"));
+            delegate,
+            circuitBreakerRegistry,
+            retryRegistry,
+            5,
+            Map.of("getDeployments", "deployment"));
 
     String result = provider.getToolCallbacks()[0].call("{}", null);
 

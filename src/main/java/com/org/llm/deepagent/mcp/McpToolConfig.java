@@ -1,4 +1,4 @@
-package com.org.llm.orchestrator.mcp;
+package com.org.llm.deepagent.mcp;
 
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.retry.RetryRegistry;

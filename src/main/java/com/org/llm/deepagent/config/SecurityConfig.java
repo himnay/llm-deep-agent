@@ -1,4 +1,4 @@
-package com.org.llm.orchestrator.config;
+package com.org.llm.deepagent.config;
 
 import java.util.Arrays;
 import java.util.Collection;

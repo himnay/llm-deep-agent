@@ -1,4 +1,4 @@
-package com.org.llm.orchestrator.exception;
+package com.org.llm.deepagent.exception;
 
 /**
  * Thrown when a client-credentials token request to the identity provider (e.g. Keycloak) fails or

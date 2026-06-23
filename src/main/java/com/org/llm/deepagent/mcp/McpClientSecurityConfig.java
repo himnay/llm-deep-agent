@@ -1,4 +1,4 @@
-package com.org.llm.orchestrator.mcp;
+package com.org.llm.deepagent.mcp;
 
 import io.modelcontextprotocol.client.transport.HttpClientStreamableHttpTransport;
 import io.modelcontextprotocol.client.transport.customizer.McpSyncHttpClientRequestCustomizer;
