@@ -2,6 +2,7 @@ package com.org.llm.deepagent.agent;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.org.llm.deepagent.client.GatewayClient;
+import com.org.llm.deepagent.security.PromptInjectionGuard;
 import com.org.llm.deepagent.client.dto.GatewayChatResponse;
 import com.org.llm.deepagent.exception.AgentRunNotFoundException;
 import com.org.llm.deepagent.exception.InvalidRunStateException;
@@ -51,6 +52,7 @@ public class AgentLoopExecutor {
   private final ObjectMapper objectMapper;
   private final MeterRegistry meterRegistry;
   private final Executor agentRunExecutor;
+  private final PromptInjectionGuard injectionGuard;
 
   /**
    * Creates a top-level run owned by {@code createdBy} and submits it to {@link #continueRun} on
@@ -58,6 +60,11 @@ public class AgentLoopExecutor {
    * progress via {@code GET /agent/run/{id}} (poll) or {@code GET /agent/run/{id}/events} (SSE).
    */
   public AgentRun startRun(String prompt, String sessionId, String createdBy) {
+    if (!injectionGuard.isQuerySafe(prompt)) {
+      log.warn("AGENT_LOOP | injection guard rejected run | createdBy={}", createdBy);
+      throw new com.org.llm.deepagent.exception.InvalidRunStateException(
+          injectionGuard.blockMessage());
+    }
     long runId = agentRunRepository.createRun(sessionId, prompt, null, null, createdBy);
     log.info("AGENT_LOOP | run={} | started | createdBy={}", runId, createdBy);
     agentRunExecutor.execute(() -> continueRun(runId));
