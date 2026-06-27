@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
@@ -13,8 +13,10 @@
     <artifactId>llm-deep-agent</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>llm-orchestrator</name>
+
     <description>Agentic orchestration service — chains llm-gateway, llm-rag and llm-mcp tools behind
-        a ReAct-style plan/act/observe loop, dispatched through a RoutingStrategy chain.</description>
+        a ReAct-style plan/act/observe loop, dispatched through a RoutingStrategy chain.
+    </description>
 
     <dependencies>
         <dependency>
@@ -50,6 +52,10 @@
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-model-chat-memory-repository-jdbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-template-st</artifactId>
         </dependency>
 
         <!-- Run/step audit trail -->
@@ -179,25 +185,6 @@
 
     <build>
         <plugins>
-            <plugin>
-                <groupId>com.diffplug.spotless</groupId>
-                <artifactId>spotless-maven-plugin</artifactId>
-                <configuration>
-                    <java>
-                        <googleJavaFormat/>
-                        <removeUnusedImports/>
-                    </java>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>spotless-check</id>
-                        <phase>verify</phase>
-                        <goals>
-                            <goal>check</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>

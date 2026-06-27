@@ -5,7 +5,7 @@ package com.org.llm.deepagent.exception;
  */
 public class AgentArtifactNotFoundException extends RuntimeException {
 
-  public AgentArtifactNotFoundException(long rootRunId, String path) {
-    super("No scratchpad file at '" + path + "' for run " + rootRunId);
-  }
+    public AgentArtifactNotFoundException(long rootRunId, String path) {
+        super("No scratchpad file at '" + path + "' for run " + rootRunId);
+    }
 }

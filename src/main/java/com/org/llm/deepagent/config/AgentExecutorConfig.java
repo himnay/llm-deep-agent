@@ -3,11 +3,12 @@ package com.org.llm.deepagent.config;
 import io.micrometer.context.ContextExecutorService;
 import io.micrometer.context.ContextRegistry;
 import io.micrometer.context.integration.Slf4jThreadLocalAccessor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 
 /**
  * The background executor that runs agent loops once {@code POST /agent/run} returns — kept as an
@@ -19,14 +20,16 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class AgentExecutorConfig {
 
-  public AgentExecutorConfig() {
-    ContextRegistry.getInstance().registerThreadLocalAccessor(new Slf4jThreadLocalAccessor());
-  }
+    public AgentExecutorConfig() {
+        ContextRegistry.getInstance().registerThreadLocalAccessor(new Slf4jThreadLocalAccessor());
+    }
 
-  /** Virtual-thread-per-task executor — matches the pattern already used for MCP tool calls. */
-  @Bean
-  public Executor agentRunExecutor() {
-    ExecutorService virtualThreads = Executors.newVirtualThreadPerTaskExecutor();
-    return ContextExecutorService.wrap(virtualThreads);
-  }
+    /**
+     * Virtual-thread-per-task executor — matches the pattern already used for MCP tool calls.
+     */
+    @Bean
+    public Executor agentRunExecutor() {
+        ExecutorService virtualThreads = Executors.newVirtualThreadPerTaskExecutor();
+        return ContextExecutorService.wrap(virtualThreads);
+    }
 }

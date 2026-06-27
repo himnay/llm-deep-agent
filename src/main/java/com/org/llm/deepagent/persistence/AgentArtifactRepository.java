@@ -1,13 +1,14 @@
 package com.org.llm.deepagent.persistence;
 
-import com.org.llm.deepagent.agent.AgentArtifact;
+import com.org.llm.deepagent.agent.dto.AgentArtifact;
+import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
+
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Repository;
 
 /**
  * Plain {@link JdbcTemplate} persistence for {@code agent_artifact} — the virtual filesystem behind
@@ -17,71 +18,75 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public class AgentArtifactRepository {
 
-  private final JdbcTemplate jdbc;
+    private final JdbcTemplate jdbc;
 
-  /** Creates or overwrites the file at {@code path} within a run tree's scratchpad. */
-  public void upsert(long rootRunId, String path, String content) {
-    int updated =
-        jdbc.update(
-            "UPDATE agent_artifact SET content = ?, updated_at = NOW() WHERE root_run_id = ? AND path = ?",
-            content,
-            rootRunId,
-            path);
-    if (updated == 0) {
-      jdbc.update(
-          "INSERT INTO agent_artifact (root_run_id, path, content) VALUES (?, ?, ?)",
-          rootRunId,
-          path,
-          content);
+    private static Instant toInstant(Timestamp timestamp) {
+        return timestamp != null ? timestamp.toInstant() : null;
     }
-  }
 
-  /** The current content of one scratchpad file, or empty if it doesn't exist. */
-  public Optional<AgentArtifact> findByRootRunIdAndPath(long rootRunId, String path) {
-    List<AgentArtifact> matches =
-        jdbc.query(
-            "SELECT id, root_run_id, path, content, updated_at FROM agent_artifact "
-                + "WHERE root_run_id = ? AND path = ?",
-            (rs, rowNum) ->
-                new AgentArtifact(
-                    rs.getLong("id"),
-                    rs.getLong("root_run_id"),
-                    rs.getString("path"),
-                    rs.getString("content"),
-                    toInstant(rs.getTimestamp("updated_at"))),
-            rootRunId,
-            path);
-    return matches.stream().findFirst();
-  }
+    /**
+     * Creates or overwrites the file at {@code path} within a run tree's scratchpad.
+     */
+    public void upsert(long rootRunId, String path, String content) {
+        int updated =
+                jdbc.update(
+                        "UPDATE agent_artifact SET content = ?, updated_at = NOW() WHERE root_run_id = ? AND path = ?",
+                        content,
+                        rootRunId,
+                        path);
+        if (updated == 0) {
+            jdbc.update(
+                    "INSERT INTO agent_artifact (root_run_id, path, content) VALUES (?, ?, ?)",
+                    rootRunId,
+                    path,
+                    content);
+        }
+    }
 
-  /**
-   * Every file currently in a run tree's scratchpad, without content (path + last-updated only).
-   */
-  public List<AgentArtifact> listByRootRunId(long rootRunId) {
-    return jdbc.query(
-        "SELECT id, root_run_id, path, '' AS content, updated_at FROM agent_artifact "
-            + "WHERE root_run_id = ? ORDER BY path ASC",
-        (rs, rowNum) ->
-            new AgentArtifact(
-                rs.getLong("id"),
-                rs.getLong("root_run_id"),
-                rs.getString("path"),
-                rs.getString("content"),
-                toInstant(rs.getTimestamp("updated_at"))),
-        rootRunId);
-  }
+    /**
+     * The current content of one scratchpad file, or empty if it doesn't exist.
+     */
+    public Optional<AgentArtifact> findByRootRunIdAndPath(long rootRunId, String path) {
+        List<AgentArtifact> matches =
+                jdbc.query(
+                        "SELECT id, root_run_id, path, content, updated_at FROM agent_artifact "
+                                + "WHERE root_run_id = ? AND path = ?",
+                        (rs, rowNum) ->
+                                new AgentArtifact(
+                                        rs.getLong("id"),
+                                        rs.getLong("root_run_id"),
+                                        rs.getString("path"),
+                                        rs.getString("content"),
+                                        toInstant(rs.getTimestamp("updated_at"))),
+                        rootRunId,
+                        path);
+        return matches.stream().findFirst();
+    }
 
-  /**
-   * Number of distinct files currently stored for a run tree — used to enforce the scratchpad cap.
-   */
-  public int countByRootRunId(long rootRunId) {
-    Integer count =
-        jdbc.queryForObject(
-            "SELECT COUNT(*) FROM agent_artifact WHERE root_run_id = ?", Integer.class, rootRunId);
-    return count == null ? 0 : count;
-  }
+    /**
+     * Every file currently in a run tree's scratchpad, without content (path + last-updated only).
+     */
+    public List<AgentArtifact> listByRootRunId(long rootRunId) {
+        return jdbc.query(
+                "SELECT id, root_run_id, path, '' AS content, updated_at FROM agent_artifact "
+                        + "WHERE root_run_id = ? ORDER BY path ASC",
+                (rs, rowNum) ->
+                        new AgentArtifact(
+                                rs.getLong("id"),
+                                rs.getLong("root_run_id"),
+                                rs.getString("path"),
+                                rs.getString("content"),
+                                toInstant(rs.getTimestamp("updated_at"))),
+                rootRunId);
+    }
 
-  private static Instant toInstant(Timestamp timestamp) {
-    return timestamp != null ? timestamp.toInstant() : null;
-  }
+    /**
+     * Number of distinct files currently stored for a run tree — used to enforce the scratchpad cap.
+     */
+    public int countByRootRunId(long rootRunId) {
+        Integer count =
+                jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM agent_artifact WHERE root_run_id = ?", Integer.class, rootRunId);
+        return count == null ? 0 : count;
+    }
 }

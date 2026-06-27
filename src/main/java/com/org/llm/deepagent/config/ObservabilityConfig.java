@@ -20,25 +20,29 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class ObservabilityConfig {
 
-  @Bean
-  ObservedAspect observedAspect(ObservationRegistry registry) {
-    return new ObservedAspect(registry);
-  }
+    @Bean
+    ObservedAspect observedAspect(ObservationRegistry registry) {
+        return new ObservedAspect(registry);
+    }
 
-  @Bean
-  TimedAspect timedAspect(MeterRegistry registry) {
-    return new TimedAspect(registry);
-  }
+    @Bean
+    TimedAspect timedAspect(MeterRegistry registry) {
+        return new TimedAspect(registry);
+    }
 
-  /** Linux-only (backed by {@code /proc}); no-op gauges on macOS/Windows. */
-  @Bean
-  MeterBinder processMemoryMetrics() {
-    return new ProcessMemoryMetrics();
-  }
+    /**
+     * Linux-only (backed by {@code /proc}); no-op gauges on macOS/Windows.
+     */
+    @Bean
+    MeterBinder processMemoryMetrics() {
+        return new ProcessMemoryMetrics();
+    }
 
-  /** Linux-only, same as {@link #processMemoryMetrics()}. */
-  @Bean
-  MeterBinder processThreadMetrics() {
-    return new ProcessThreadMetrics();
-  }
+    /**
+     * Linux-only, same as {@link #processMemoryMetrics()}.
+     */
+    @Bean
+    MeterBinder processThreadMetrics() {
+        return new ProcessThreadMetrics();
+    }
 }

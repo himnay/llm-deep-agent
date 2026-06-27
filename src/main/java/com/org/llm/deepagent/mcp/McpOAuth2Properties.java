@@ -13,7 +13,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "mcp.oauth2")
 public class McpOAuth2Properties {
 
-  private String tokenUri = "http://localhost:8180/realms/org-mcp/protocol/openid-connect/token";
-  private String clientId = "llm-orchestrator";
-  private String clientSecret = "llm-orchestrator-secret";
+    private String tokenUri = "http://localhost:8180/realms/org-mcp/protocol/openid-connect/token";
+    private String clientId = "llm-orchestrator";
+    private String clientSecret = "llm-orchestrator-secret";
 }

@@ -6,11 +6,11 @@ package com.org.llm.deepagent.exception;
  */
 public class McpToolCallException extends RuntimeException {
 
-  public McpToolCallException(String message) {
-    super(message);
-  }
+    public McpToolCallException(String message) {
+        super(message);
+    }
 
-  public McpToolCallException(String message, Throwable cause) {
-    super(message, cause);
-  }
+    public McpToolCallException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

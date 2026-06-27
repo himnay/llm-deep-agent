@@ -1,10 +1,22 @@
 FROM eclipse-temurin:25-jdk AS build
 WORKDIR /workspace
-COPY mvnw pom.xml ./
-COPY .mvn .mvn
-RUN ./mvnw dependency:go-offline -q
-COPY src src
-RUN ./mvnw package -DskipTests -q
+
+# Install private parent POMs that are not in any public Maven registry
+COPY super-pom/pom.xml super-pom.xml
+COPY maven-bom/pom.xml learning-bom.xml
+RUN --mount=type=cache,target=/root/.m2 \
+    mkdir -p /root/.m2/repository/com/org/llm/super-pom/1.0.0 \
+    && cp super-pom.xml /root/.m2/repository/com/org/llm/super-pom/1.0.0/super-pom-1.0.0.pom \
+    && mkdir -p /root/.m2/repository/com/org/learning/learning-bom/1.0.0 \
+    && cp learning-bom.xml /root/.m2/repository/com/org/learning/learning-bom/1.0.0/learning-bom-1.0.0.pom
+
+# Resolve dependencies separately so this layer is cached until pom.xml changes
+COPY LLM/llm-deep-agent/mvnw LLM/llm-deep-agent/pom.xml ./
+COPY LLM/llm-deep-agent/.mvn .mvn/
+RUN --mount=type=cache,target=/root/.m2 ./mvnw dependency:go-offline -q
+
+COPY LLM/llm-deep-agent/src src/
+RUN --mount=type=cache,target=/root/.m2 ./mvnw package -DskipTests -q
 
 FROM eclipse-temurin:25-jre AS extract
 WORKDIR /app

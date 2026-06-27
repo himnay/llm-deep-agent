@@ -1,4 +1,4 @@
-package com.org.llm.deepagent.agent;
+package com.org.llm.deepagent.agent.dto;
 
 import java.time.Instant;
 
@@ -7,4 +7,5 @@ import java.time.Instant;
  * by {@code path} within {@code rootRunId}. Written/read via {@code FILE_WRITE}/{@code FILE_READ}.
  */
 public record AgentArtifact(
-    Long id, Long rootRunId, String path, String content, Instant updatedAt) {}
+        Long id, Long rootRunId, String path, String content, Instant updatedAt) {
+}

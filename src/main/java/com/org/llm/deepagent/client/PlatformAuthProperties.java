@@ -12,8 +12,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "platform.auth")
 public class PlatformAuthProperties {
 
-  private String tokenUri =
-      "http://localhost:8081/realms/llm-gateway/protocol/openid-connect/token";
-  private String clientId = "llm-orchestrator-client";
-  private String clientSecret = "llm-orchestrator-dev-secret";
+    private String tokenUri =
+            "http://localhost:8081/realms/llm-gateway/protocol/openid-connect/token";
+    private String clientId = "llm-orchestrator-client";
+    private String clientSecret = "llm-orchestrator-dev-secret";
 }

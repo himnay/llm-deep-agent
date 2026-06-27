@@ -17,40 +17,40 @@ import org.springframework.util.StringUtils;
  *   <li>every other connection — the legacy shared bearer token ({@code mcp.auth-token}, bound from
  *       {@code MCP_AUTH_TOKEN}).
  * </ul>
- *
+ * <p>
  * In Spring AI 2.0.x the Streamable-HTTP transport is configured through a {@link
  * McpClientCustomizer}, the only customizer hook that receives the connection name.
  */
 @Configuration
 public class McpClientSecurityConfig {
 
-  private static final String OAUTH2_CONNECTION_NAME = "deployment";
+    private static final String OAUTH2_CONNECTION_NAME = "deployment";
 
-  @Bean
-  public McpClientCustomizer<HttpClientStreamableHttpTransport.Builder> mcpAuthTransportCustomizer(
-      McpProperties properties, McpTokenService mcpTokenService) {
-    McpSyncHttpClientRequestCustomizer oauth2Customizer = oauth2RequestCustomizer(mcpTokenService);
-    McpSyncHttpClientRequestCustomizer staticTokenCustomizer =
-        staticBearerRequestCustomizer(properties);
+    @Bean
+    public McpClientCustomizer<HttpClientStreamableHttpTransport.Builder> mcpAuthTransportCustomizer(
+            McpProperties properties, McpTokenService mcpTokenService) {
+        McpSyncHttpClientRequestCustomizer oauth2Customizer = oauth2RequestCustomizer(mcpTokenService);
+        McpSyncHttpClientRequestCustomizer staticTokenCustomizer =
+                staticBearerRequestCustomizer(properties);
 
-    return (name, transportBuilder) ->
-        transportBuilder.httpRequestCustomizer(
-            OAUTH2_CONNECTION_NAME.equals(name) ? oauth2Customizer : staticTokenCustomizer);
-  }
+        return (name, transportBuilder) ->
+                transportBuilder.httpRequestCustomizer(
+                        OAUTH2_CONNECTION_NAME.equals(name) ? oauth2Customizer : staticTokenCustomizer);
+    }
 
-  private McpSyncHttpClientRequestCustomizer staticBearerRequestCustomizer(
-      McpProperties properties) {
-    return (builder, method, endpoint, body, context) -> {
-      String token = properties.getAuthToken();
-      if (StringUtils.hasText(token)) {
-        builder.header("Authorization", "Bearer " + token);
-      }
-    };
-  }
+    private McpSyncHttpClientRequestCustomizer staticBearerRequestCustomizer(
+            McpProperties properties) {
+        return (builder, method, endpoint, body, context) -> {
+            String token = properties.getAuthToken();
+            if (StringUtils.hasText(token)) {
+                builder.header("Authorization", "Bearer " + token);
+            }
+        };
+    }
 
-  private McpSyncHttpClientRequestCustomizer oauth2RequestCustomizer(
-      McpTokenService mcpTokenService) {
-    return (builder, method, endpoint, body, context) ->
-        builder.header("Authorization", "Bearer " + mcpTokenService.getToken());
-  }
+    private McpSyncHttpClientRequestCustomizer oauth2RequestCustomizer(
+            McpTokenService mcpTokenService) {
+        return (builder, method, endpoint, body, context) ->
+                builder.header("Authorization", "Bearer " + mcpTokenService.getToken());
+    }
 }

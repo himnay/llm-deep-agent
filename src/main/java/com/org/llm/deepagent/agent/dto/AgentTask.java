@@ -1,4 +1,4 @@
-package com.org.llm.deepagent.agent;
+package com.org.llm.deepagent.agent.dto;
 
 import java.time.Instant;
 
@@ -7,9 +7,10 @@ import java.time.Instant;
  * wholesale on every {@code PLAN_TASKS} step (snapshot semantics, not incremental edits).
  */
 public record AgentTask(
-    Long id,
-    Long rootRunId,
-    String taskKey,
-    String description,
-    AgentTaskStatus status,
-    Instant updatedAt) {}
+        Long id,
+        Long rootRunId,
+        String taskKey,
+        String description,
+        AgentTaskStatus status,
+        Instant updatedAt) {
+}

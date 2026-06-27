@@ -1,9 +1,5 @@
 package com.org.llm.deepagent.config;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,6 +19,11 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+
 /**
  * Keycloak OAuth2 resource-server security for the REST API (servlet stack) — same pattern as every
  * other service on the platform: {@code Authorization: Bearer <jwt>} validated against the shared
@@ -39,78 +40,78 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-  private static final String[] PUBLIC_PATHS = {
-    "/actuator/**", "/error", "/api-docs/**", "/swagger-ui/**", "/swagger-ui.html"
-  };
+    private static final String[] PUBLIC_PATHS = {
+            "/actuator/**", "/error", "/api-docs/**", "/swagger-ui/**", "/swagger-ui.html"
+    };
 
-  @Value("${gateway-auth.enabled:true}")
-  private boolean authEnabled;
+    @Value("${gateway-auth.enabled:true}")
+    private boolean authEnabled;
 
-  @Value("${gateway-auth.cors.allowed-origins:}")
-  private List<String> allowedOrigins;
+    @Value("${gateway-auth.cors.allowed-origins:}")
+    private List<String> allowedOrigins;
 
-  @Bean
-  public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-    http.csrf(AbstractHttpConfigurer::disable)
-        .httpBasic(AbstractHttpConfigurer::disable)
-        .formLogin(AbstractHttpConfigurer::disable)
-        .logout(AbstractHttpConfigurer::disable)
-        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-        .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-        .headers(
-            headers ->
-                headers
-                    .frameOptions(frame -> frame.deny())
-                    .referrerPolicy(
-                        r -> r.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.SAME_ORIGIN))
-                    .httpStrictTransportSecurity(
-                        hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31_536_000)));
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http.csrf(AbstractHttpConfigurer::disable)
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable)
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .headers(
+                        headers ->
+                                headers
+                                        .frameOptions(frame -> frame.deny())
+                                        .referrerPolicy(
+                                                r -> r.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.SAME_ORIGIN))
+                                        .httpStrictTransportSecurity(
+                                                hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31_536_000)));
 
-    if (!authEnabled) {
-      log.warn("SECURITY | OAuth2 authentication is DISABLED (gateway-auth.enabled=false)");
-      return http.authorizeHttpRequests(a -> a.anyRequest().permitAll()).build();
+        if (!authEnabled) {
+            log.warn("SECURITY | OAuth2 authentication is DISABLED (gateway-auth.enabled=false)");
+            return http.authorizeHttpRequests(a -> a.anyRequest().permitAll()).build();
+        }
+
+        log.info("SECURITY | OAuth2 (Keycloak) JWT authentication is ENABLED");
+        return http.oauth2ResourceServer(
+                        oauth2 ->
+                                oauth2.jwt(
+                                        jwt -> jwt.jwtAuthenticationConverter(keycloakJwtAuthenticationConverter())))
+                .authorizeHttpRequests(
+                        a -> a.requestMatchers(PUBLIC_PATHS).permitAll().anyRequest().authenticated())
+                .build();
     }
 
-    log.info("SECURITY | OAuth2 (Keycloak) JWT authentication is ENABLED");
-    return http.oauth2ResourceServer(
-            oauth2 ->
-                oauth2.jwt(
-                    jwt -> jwt.jwtAuthenticationConverter(keycloakJwtAuthenticationConverter())))
-        .authorizeHttpRequests(
-            a -> a.requestMatchers(PUBLIC_PATHS).permitAll().anyRequest().authenticated())
-        .build();
-  }
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        List<String> origins = allowedOrigins.stream().filter(o -> !o.isBlank()).toList();
 
-  @Bean
-  public CorsConfigurationSource corsConfigurationSource() {
-    List<String> origins = allowedOrigins.stream().filter(o -> !o.isBlank()).toList();
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(origins);
+        config.setAllowedMethods(Arrays.asList("GET", "POST", "OPTIONS"));
+        config.setAllowedHeaders(List.of("Content-Type", "Authorization"));
+        config.setMaxAge(3600L);
 
-    CorsConfiguration config = new CorsConfiguration();
-    config.setAllowedOrigins(origins);
-    config.setAllowedMethods(Arrays.asList("GET", "POST", "OPTIONS"));
-    config.setAllowedHeaders(List.of("Content-Type", "Authorization"));
-    config.setMaxAge(3600L);
-
-    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-    source.registerCorsConfiguration("/**", config);
-    return source;
-  }
-
-  private JwtAuthenticationConverter keycloakJwtAuthenticationConverter() {
-    JwtAuthenticationConverter delegate = new JwtAuthenticationConverter();
-    delegate.setJwtGrantedAuthoritiesConverter(this::keycloakAuthoritiesConverter);
-    return delegate;
-  }
-
-  @SuppressWarnings("unchecked")
-  private Collection<GrantedAuthority> keycloakAuthoritiesConverter(Jwt jwt) {
-    Map<String, Object> realmAccess = jwt.getClaimAsMap("realm_access");
-    if (realmAccess == null || !(realmAccess.get("roles") instanceof Collection<?> roles)) {
-      return List.of();
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
     }
-    return roles.stream()
-        .map(String::valueOf)
-        .map(role -> (GrantedAuthority) new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()))
-        .toList();
-  }
+
+    private JwtAuthenticationConverter keycloakJwtAuthenticationConverter() {
+        JwtAuthenticationConverter delegate = new JwtAuthenticationConverter();
+        delegate.setJwtGrantedAuthoritiesConverter(this::keycloakAuthoritiesConverter);
+        return delegate;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Collection<GrantedAuthority> keycloakAuthoritiesConverter(Jwt jwt) {
+        Map<String, Object> realmAccess = jwt.getClaimAsMap("realm_access");
+        if (realmAccess == null || !(realmAccess.get("roles") instanceof Collection<?> roles)) {
+            return List.of();
+        }
+        return roles.stream()
+                .map(String::valueOf)
+                .map(role -> (GrantedAuthority) new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()))
+                .toList();
+    }
 }

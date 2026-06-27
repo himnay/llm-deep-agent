@@ -1,0 +1,25 @@
+spring:
+  config:
+    activate:
+      on-profile: test
+
+  ai:
+    openai:
+      api-key: test-key
+      chat:
+        options:
+          model: gpt-4o-mini
+
+logging:
+  level:
+    root: WARN
+    com.org: DEBUG
+
+management:
+  tracing:
+    enabled: false
+
+app:
+  security:
+    injection-guard:
+      enabled: true

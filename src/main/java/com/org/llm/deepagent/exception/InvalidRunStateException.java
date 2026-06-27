@@ -6,7 +6,7 @@ package com.org.llm.deepagent.exception;
  */
 public class InvalidRunStateException extends RuntimeException {
 
-  public InvalidRunStateException(String message) {
-    super(message);
-  }
+    public InvalidRunStateException(String message) {
+        super(message);
+    }
 }

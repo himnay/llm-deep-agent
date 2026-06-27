@@ -63,7 +63,9 @@ public class PromptInjectionGuard {
         return safe;
     }
 
-    /** The configured rejection message. */
+    /**
+     * The configured rejection message.
+     */
     public String blockMessage() {
         return blockMessage;
     }

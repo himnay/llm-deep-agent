@@ -6,11 +6,11 @@ package com.org.llm.deepagent.exception;
  */
 public class TokenAcquisitionException extends RuntimeException {
 
-  public TokenAcquisitionException(String message) {
-    super(message);
-  }
+    public TokenAcquisitionException(String message) {
+        super(message);
+    }
 
-  public TokenAcquisitionException(String message, Throwable cause) {
-    super(message, cause);
-  }
+    public TokenAcquisitionException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

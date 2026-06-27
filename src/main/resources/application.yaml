@@ -262,3 +262,11 @@ app:
         - "(?i)jailbreak"
         - "(?i)developer\\s+mode"
         - "(?i)DAN\\s+mode"
+
+app:
+  features:
+    human-approval-enabled: ${HUMAN_APPROVAL_ENABLED:true}
+    sub-agent-delegation-enabled: ${SUB_AGENT_DELEGATION_ENABLED:true}
+    rag-retrieval-enabled: ${RAG_RETRIEVAL_ENABLED:true}
+    audit-logging-enabled: ${AUDIT_LOGGING_ENABLED:true}
+    step-compaction-enabled: ${STEP_COMPACTION_ENABLED:true}

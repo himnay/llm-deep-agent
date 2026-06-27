@@ -5,7 +5,7 @@ package com.org.llm.deepagent.exception;
  */
 public class RunAccessDeniedException extends RuntimeException {
 
-  public RunAccessDeniedException(long runId) {
-    super("You do not have access to run " + runId);
-  }
+    public RunAccessDeniedException(long runId) {
+        super("You do not have access to run " + runId);
+    }
 }
