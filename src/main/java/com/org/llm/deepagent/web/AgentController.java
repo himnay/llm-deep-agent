@@ -38,7 +38,7 @@ import java.util.List;
 @Tag(name = "Agent")
 @Slf4j
 @RestController
-@RequestMapping("/agent")
+@RequestMapping("/api/v1/agent")
 @RequiredArgsConstructor
 public class AgentController {
 

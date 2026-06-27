@@ -19,6 +19,15 @@ public enum AgentAction {
      */
     RAG_GENERATE,
     /**
+     * Structured graph-context answer from llm-rag-graph (Neo4j + Anthropic).
+     */
+    GRAPH_RAG_QUERY,
+    /**
+     * Hybrid: queries both llm-rag-pipeline (vector) and llm-rag-graph (Neo4j) in parallel,
+     * merges results, and returns a combined context to the planner.
+     */
+    HYBRID_RAG,
+    /**
      * Invoke a named MCP tool exposed by one of llm-mcp's servers.
      */
     MCP_TOOL,

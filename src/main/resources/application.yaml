@@ -141,6 +141,11 @@ rag:
   base-url: ${RAG_BASE_URL:http://localhost:8081/api/v1}
   timeout-seconds: 60
 
+graph-rag:
+  base-url: ${GRAPH_RAG_BASE_URL:http://localhost:8083/api/v1}
+  timeout-seconds: 60
+  enabled: ${GRAPH_RAG_ENABLED:true}
+
 # ── Inbound security (this service's own API) ────────────────────────────────
 gateway-auth:
   enabled: ${GATEWAY_AUTH_ENABLED:true}
@@ -179,6 +184,12 @@ resilience4j:
         waitDurationInOpenState: 30s
         permittedNumberOfCallsInHalfOpenState: 3
         automaticTransitionFromOpenToHalfOpenEnabled: true
+      graph-rag:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
       mcp-deployment:
         slidingWindowSize: 10
         failureRateThreshold: 50
@@ -202,6 +213,11 @@ resilience4j:
         enableExponentialBackoff: true
         exponentialBackoffMultiplier: 2
       rag:
+        maxAttempts: 3
+        waitDuration: 1s
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+      graph-rag:
         maxAttempts: 3
         waitDuration: 1s
         enableExponentialBackoff: true
