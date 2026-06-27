@@ -3,8 +3,10 @@ package com.org.llm.deepagent.security;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.UnknownHostException;
 import java.util.Set;
 
 /**
@@ -46,6 +48,17 @@ public class UrlAllowlistValidator {
         if (host == null || host.isBlank()) {
             throw new IllegalArgumentException(
                     "SSRF | " + fieldName + " has no host component: " + url);
+        }
+        try {
+            InetAddress addr = InetAddress.getByName(host);
+            if (addr.isLoopbackAddress() || addr.isLinkLocalAddress()
+                    || addr.isSiteLocalAddress() || addr.isMulticastAddress()) {
+                throw new IllegalArgumentException(
+                        "SSRF | " + fieldName + " resolves to a private/reserved address: " + host);
+            }
+        } catch (UnknownHostException e) {
+            throw new IllegalArgumentException(
+                    "SSRF | " + fieldName + " host cannot be resolved: " + host, e);
         }
         log.debug("SSRF | URL validated: {} = {}", fieldName, url);
     }

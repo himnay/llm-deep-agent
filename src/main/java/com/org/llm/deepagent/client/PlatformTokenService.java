@@ -24,9 +24,14 @@ public class PlatformTokenService {
 
     private final PlatformAuthProperties properties;
     private final RestClient restClient;
+    private record TokenHolder(String token, Instant expiresAt) {
+        boolean isValid(long bufferSeconds) {
+            return token != null && Instant.now().isBefore(expiresAt.minusSeconds(bufferSeconds));
+        }
+    }
+
     private final ReentrantLock lock = new ReentrantLock();
-    private volatile String cachedToken;
-    private volatile Instant expiresAt = Instant.EPOCH;
+    private volatile TokenHolder tokenHolder = new TokenHolder(null, Instant.EPOCH);
     public PlatformTokenService(
             RestClient.Builder restClientBuilder, PlatformAuthProperties properties) {
         this.properties = properties;
@@ -34,23 +39,18 @@ public class PlatformTokenService {
     }
 
     public String getToken() {
-        if (isValid()) {
-            return cachedToken;
+        if (tokenHolder.isValid(REFRESH_BUFFER_SECONDS)) {
+            return tokenHolder.token();
         }
         lock.lock();
         try {
-            if (isValid()) {
-                return cachedToken;
+            if (tokenHolder.isValid(REFRESH_BUFFER_SECONDS)) {
+                return tokenHolder.token();
             }
             return fetchToken();
         } finally {
             lock.unlock();
         }
-    }
-
-    private boolean isValid() {
-        return cachedToken != null
-                && Instant.now().isBefore(expiresAt.minusSeconds(REFRESH_BUFFER_SECONDS));
     }
 
     private String fetchToken() {
@@ -76,10 +76,11 @@ public class PlatformTokenService {
                     "Keycloak token response was null or missing access_token");
         }
 
-        cachedToken = response.accessToken();
-        expiresAt = Instant.now().plusSeconds(response.expiresIn());
+        // Single volatile write — eliminates the two-field update race window
+        tokenHolder = new TokenHolder(response.accessToken(),
+                Instant.now().plusSeconds(response.expiresIn()));
         log.info("PLATFORM_TOKEN | refreshed | expiresInSeconds={}", response.expiresIn());
-        return cachedToken;
+        return tokenHolder.token();
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

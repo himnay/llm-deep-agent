@@ -325,6 +325,7 @@ public class AgentLoopExecutor {
     private AgentStep dispatchAndPersist(
             AgentContext context, PlannedAction plannedAction, int stepIndex) {
         StepResult result = routingStrategyChain.dispatch(context, plannedAction);
+        String observation = sanitizeObservation(context.runId(), stepIndex, result.observation());
         AgentStep step =
                 new AgentStep(
                         null,
@@ -333,11 +334,28 @@ public class AgentLoopExecutor {
                         plannedAction.action(),
                         plannedAction.toolName(),
                         plannedAction.input(),
-                        result.observation(),
+                        observation,
                         plannedAction.reasoning(),
                         Instant.now());
         agentRunRepository.saveStep(step);
         return step;
+    }
+
+    /**
+     * Scans tool/RAG observations for prompt-injection patterns before they re-enter the planner
+     * transcript. Attacker-controlled external data (MCP tool results, web pages) can carry
+     * injection payloads — blocking them here prevents indirect prompt injection.
+     */
+    private String sanitizeObservation(long runId, int stepIndex, String observation) {
+        if (observation == null || observation.isBlank()) {
+            return observation;
+        }
+        if (!injectionGuard.isQuerySafe(observation)) {
+            log.warn("AGENT_LOOP | injection pattern detected in tool observation | run={} step={}",
+                    runId, stepIndex);
+            return "[TOOL OUTPUT BLOCKED: observation contained a disallowed injection pattern]";
+        }
+        return observation;
     }
 
     private void finish(long runId, AgentRunStatus status, String finalAnswer) {

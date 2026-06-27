@@ -26,21 +26,17 @@ public class AgentArtifactRepository {
 
     /**
      * Creates or overwrites the file at {@code path} within a run tree's scratchpad.
+     * Atomic ON CONFLICT prevents duplicate-key race when parent and sub-agent write concurrently.
      */
     public void upsert(long rootRunId, String path, String content) {
-        int updated =
-                jdbc.update(
-                        "UPDATE agent_artifact SET content = ?, updated_at = NOW() WHERE root_run_id = ? AND path = ?",
-                        content,
-                        rootRunId,
-                        path);
-        if (updated == 0) {
-            jdbc.update(
-                    "INSERT INTO agent_artifact (root_run_id, path, content) VALUES (?, ?, ?)",
-                    rootRunId,
-                    path,
-                    content);
-        }
+        jdbc.update(
+                "INSERT INTO agent_artifact (root_run_id, path, content, updated_at) "
+                        + "VALUES (?, ?, ?, NOW()) "
+                        + "ON CONFLICT (root_run_id, path) "
+                        + "DO UPDATE SET content = EXCLUDED.content, updated_at = NOW()",
+                rootRunId,
+                path,
+                content);
     }
 
     /**

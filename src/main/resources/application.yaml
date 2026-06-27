@@ -5,6 +5,42 @@ app:
     group-id: com.org.llm
     artifact-id: llm-orchestrator
     project-version: 0.0.1-SNAPSHOT
+  security:
+    injection-guard:
+      enabled: ${INJECTION_GUARD_ENABLED:true}
+      block-message: "Your request contains disallowed instructions and cannot be processed."
+      patterns:
+        # Instruction override attacks
+        - "(?i)ignore\\s+(?:all\\s+)?(?:previous|prior|above|all)\\s+instructions?"
+        - "(?i)ignore\\s+your\\s+(system\\s+)?prompt"
+        - "(?i)forget\\s+(your|all|previous)\\s+(instructions?|context|training)"
+        - "(?i)disregard\\s+(all|previous|your)\\s+instructions?"
+        - "(?i)override\\s+(the\\s+)?(system|previous|all)\\s+(prompt|instructions?)"
+        # Roleplay / persona hijack
+        - "(?i)you\\s+are\\s+now\\s+(?:DAN|an?\\s+AI\\s+without)"
+        - "(?i)act\\s+as\\s+if\\s+you\\s+(have\\s+no|are\\s+without)\\s+(restrictions?|rules?)"
+        - "(?i)pretend\\s+(you\\s+are|to\\s+be)\\s+"
+        - "(?i)roleplay\\s+as\\s+"
+        - "(?i)simulate\\s+(a|an|the)\\s+.{0,30}(AI|model|assistant|bot)"
+        # System prompt exfiltration
+        - "(?i)(print|reveal|show|output|repeat|display)\\s+(your\\s+)?(system\\s+)?prompt"
+        - "(?i)(print|repeat|show)\\s+(all\\s+)?(your\\s+)?instructions?"
+        - "(?i)what\\s+(are|were)\\s+your\\s+instructions?"
+        # Structural delimiter injection
+        - "(?i)\\[\\s*SYSTEM\\s*\\]"
+        - "(?i)<\\s*system\\s*>"
+        - "(?i)###\\s*(instruction|system|prompt)"
+        - "(?i)```\\s*(system|instructions?)"
+        # Jailbreak keywords
+        - "(?i)jailbreak"
+        - "(?i)developer\\s+mode"
+        - "(?i)DAN\\s+mode"
+  features:
+    human-approval-enabled: ${HUMAN_APPROVAL_ENABLED:true}
+    sub-agent-delegation-enabled: ${SUB_AGENT_DELEGATION_ENABLED:true}
+    rag-retrieval-enabled: ${RAG_RETRIEVAL_ENABLED:true}
+    audit-logging-enabled: ${AUDIT_LOGGING_ENABLED:true}
+    step-compaction-enabled: ${STEP_COMPACTION_ENABLED:true}
 
 server:
   port: ${SERVER_PORT:8090} # see llm-gateway/llm-chat/llm-rag/llm-mcp READMEs for the rest of the port map
@@ -228,45 +264,5 @@ springdoc:
 # Console/JSON-file pattern and per-logger levels live in logback-spring.xml — Boot's
 # logging.pattern.* properties are ignored once a custom logback config is present.
 
-# ── Prompt injection guard ────────────────────────────────────────────────────
-# Regex patterns compiled at startup — add new signatures here without code changes.
-# These patterns are checked against the user prompt before any agent run is created.
-app:
-  security:
-    injection-guard:
-      enabled: ${INJECTION_GUARD_ENABLED:true}
-      block-message: "Your request contains disallowed instructions and cannot be processed."
-      patterns:
-        # Instruction override attacks
-        - "(?i)ignore\\s+(?:all\\s+)?(?:previous|prior|above|all)\\s+instructions?"
-        - "(?i)ignore\\s+your\\s+(system\\s+)?prompt"
-        - "(?i)forget\\s+(your|all|previous)\\s+(instructions?|context|training)"
-        - "(?i)disregard\\s+(all|previous|your)\\s+instructions?"
-        - "(?i)override\\s+(the\\s+)?(system|previous|all)\\s+(prompt|instructions?)"
-        # Roleplay / persona hijack
-        - "(?i)you\\s+are\\s+now\\s+(?:DAN|an?\\s+AI\\s+without)"
-        - "(?i)act\\s+as\\s+if\\s+you\\s+(have\\s+no|are\\s+without)\\s+(restrictions?|rules?)"
-        - "(?i)pretend\\s+(you\\s+are|to\\s+be)\\s+"
-        - "(?i)roleplay\\s+as\\s+"
-        - "(?i)simulate\\s+(a|an|the)\\s+.{0,30}(AI|model|assistant|bot)"
-        # System prompt exfiltration
-        - "(?i)(print|reveal|show|output|repeat|display)\\s+(your\\s+)?(system\\s+)?prompt"
-        - "(?i)(print|repeat|show)\\s+(all\\s+)?(your\\s+)?instructions?"
-        - "(?i)what\\s+(are|were)\\s+your\\s+instructions?"
-        # Structural delimiter injection
-        - "(?i)\\[\\s*SYSTEM\\s*\\]"
-        - "(?i)<\\s*system\\s*>"
-        - "(?i)###\\s*(instruction|system|prompt)"
-        - "(?i)```\\s*(system|instructions?)"
-        # Jailbreak keywords
-        - "(?i)jailbreak"
-        - "(?i)developer\\s+mode"
-        - "(?i)DAN\\s+mode"
-
-app:
-  features:
-    human-approval-enabled: ${HUMAN_APPROVAL_ENABLED:true}
-    sub-agent-delegation-enabled: ${SUB_AGENT_DELEGATION_ENABLED:true}
-    rag-retrieval-enabled: ${RAG_RETRIEVAL_ENABLED:true}
-    audit-logging-enabled: ${AUDIT_LOGGING_ENABLED:true}
-    step-compaction-enabled: ${STEP_COMPACTION_ENABLED:true}
+# ── Prompt injection guard + feature flags ──────────────────────────────────
+# Defined above under app.security.injection-guard and app.features
