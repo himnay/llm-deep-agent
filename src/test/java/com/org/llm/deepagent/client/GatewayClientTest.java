@@ -7,6 +7,8 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import com.org.llm.deepagent.security.UrlAllowlistValidator;
+
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
@@ -16,6 +18,7 @@ class GatewayClientTest {
 
     private final GatewayProperties properties = new GatewayProperties();
     private final PlatformTokenService tokenService = mock(PlatformTokenService.class);
+    private final UrlAllowlistValidator urlValidator = new UrlAllowlistValidator();
 
     {
         properties.setBaseUrl("http://gateway.test/llm/v1");
@@ -38,7 +41,7 @@ class GatewayClientTest {
                                 "{\"content\":\"hi there\",\"model\":\"gpt-4o\",\"provider\":\"openai\"}",
                                 MediaType.APPLICATION_JSON));
 
-        GatewayClient client = new GatewayClient(builder, properties, tokenService);
+        GatewayClient client = new GatewayClient(builder, properties, tokenService, urlValidator);
         var response = client.chat("hello", null, "session-1");
 
         assertThat(response.content()).isEqualTo("hi there");
@@ -54,7 +57,7 @@ class GatewayClientTest {
                 .andExpect(method(HttpMethod.POST))
                 .andRespond(withSuccess("{\"content\":\"planned action\"}", MediaType.APPLICATION_JSON));
 
-        GatewayClient client = new GatewayClient(builder, properties, tokenService);
+        GatewayClient client = new GatewayClient(builder, properties, tokenService, urlValidator);
         var response = client.query("what next?", "system prompt");
 
         assertThat(response.content()).isEqualTo("planned action");

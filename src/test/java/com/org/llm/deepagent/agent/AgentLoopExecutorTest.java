@@ -10,6 +10,8 @@ import com.org.llm.deepagent.persistence.AgentTaskRepository;
 import com.org.llm.deepagent.persistence.ApprovalAuditRepository;
 import com.org.llm.deepagent.routing.RoutingStrategyChain;
 import com.org.llm.deepagent.routing.StepResult;
+import com.org.llm.deepagent.security.InjectionGuardProperties;
+import com.org.llm.deepagent.security.PromptInjectionGuard;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -71,7 +73,8 @@ class AgentLoopExecutorTest {
                         agentProperties,
                         new ObjectMapper(),
                         new SimpleMeterRegistry(),
-                        synchronousExecutor);
+                        synchronousExecutor,
+                        new PromptInjectionGuard(new InjectionGuardProperties()));
     }
 
     @Test

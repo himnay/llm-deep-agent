@@ -7,6 +7,8 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import com.org.llm.deepagent.security.UrlAllowlistValidator;
+
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
@@ -16,6 +18,7 @@ class RagClientTest {
 
     private final RagProperties properties = new RagProperties();
     private final PlatformTokenService tokenService = mock(PlatformTokenService.class);
+    private final UrlAllowlistValidator urlValidator = new UrlAllowlistValidator();
 
     {
         properties.setBaseUrl("http://rag.test/api/v1");
@@ -37,7 +40,7 @@ class RagClientTest {
                                         + "\"citations\":[{\"source\":\"hr.pdf\",\"fileName\":\"hr.pdf\",\"identity\":\"hr\",\"page\":1,\"chunkIndex\":0,\"score\":0.9}]}",
                                 MediaType.APPLICATION_JSON));
 
-        RagClient client = new RagClient(builder, properties, tokenService);
+        RagClient client = new RagClient(builder, properties, tokenService, urlValidator);
         var result = client.retrieve("leave policy", 5);
 
         assertThat(result.chunks()).hasSize(1);
@@ -58,7 +61,7 @@ class RagClientTest {
                                         + "\"fromSemanticCache\":false,\"insufficientContext\":false}",
                                 MediaType.APPLICATION_JSON));
 
-        RagClient client = new RagClient(builder, properties, tokenService);
+        RagClient client = new RagClient(builder, properties, tokenService, urlValidator);
         var response = client.generate("what is the leave policy?", 5, "session-1");
 
         assertThat(response.answer()).isEqualTo("Up to 20 days/year.");
