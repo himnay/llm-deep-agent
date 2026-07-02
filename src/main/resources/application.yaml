@@ -41,6 +41,13 @@ app:
     rag-retrieval-enabled: ${RAG_RETRIEVAL_ENABLED:true}
     audit-logging-enabled: ${AUDIT_LOGGING_ENABLED:true}
     step-compaction-enabled: ${STEP_COMPACTION_ENABLED:true}
+    long-term-memory-enabled: ${LONG_TERM_MEMORY_ENABLED:false}
+  # Long-term memory tuning (facts distilled from completed runs, recalled by embedding similarity)
+  memory:
+    max-facts-per-run: ${MEMORY_MAX_FACTS_PER_RUN:5}
+    recall-top-k: ${MEMORY_RECALL_TOP_K:5}
+    min-similarity: ${MEMORY_MIN_SIMILARITY:0.75}
+    candidate-limit: ${MEMORY_CANDIDATE_LIMIT:500}
 
 server:
   port: ${SERVER_PORT:8090} # see llm-gateway/llm-chat/llm-rag/llm-mcp READMEs for the rest of the port map

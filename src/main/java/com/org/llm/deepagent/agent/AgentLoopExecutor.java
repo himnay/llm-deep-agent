@@ -60,6 +60,8 @@ public class AgentLoopExecutor {
     private final MeterRegistry meterRegistry;
     private final Executor agentRunExecutor;
     private final PromptInjectionGuard injectionGuard;
+    private final com.org.llm.deepagent.memory.LongTermMemoryService longTermMemoryService;
+    private final com.org.llm.deepagent.config.FeatureFlagProperties featureFlags;
 
     private String plannerSystemTemplate;
 
@@ -368,6 +370,13 @@ public class AgentLoopExecutor {
         }
         runEventBroadcaster.complete(runId, "done", finalRun);
         log.info("AGENT_LOOP | run={} | finished | status={}", runId, status);
+        if (featureFlags.isLongTermMemoryEnabled()
+                && status == AgentRunStatus.COMPLETED
+                && finalRun.parentRunId() == null) {
+            // Off the hot path: memory distillation is one extra LLM call and must never
+            // delay or fail the run that produced it.
+            agentRunExecutor.execute(() -> longTermMemoryService.remember(finalRun));
+        }
     }
 
     private PlannedAction plan(AgentRun run, List<AgentStep> steps, AgentContext context) {
@@ -375,7 +384,8 @@ public class AgentLoopExecutor {
         List<AgentTask> tasks = agentTaskRepository.findByRootRunId(context.rootRunId());
         String systemPrompt = plannerSystemPrompt(context.isSubAgent(), tasks);
         String userPrompt =
-                sessionHistory(run, context)
+                recalledMemories(run, context)
+                        + sessionHistory(run, context)
                         + "User request: "
                         + run.prompt()
                         + "\n\nTranscript so far:\n"
@@ -395,6 +405,20 @@ public class AgentLoopExecutor {
                     "planner call failed");
         }
         return parsePlannedAction(response.content());
+    }
+
+    /**
+     * Long-term memory block for the planner. Only fetched on a run's first planning call (one
+     * embedding lookup per run, not per iteration) and only for top-level runs — sub-agents inherit
+     * whatever the parent planner chose to pass down.
+     */
+    private String recalledMemories(AgentRun run, AgentContext context) {
+        if (!featureFlags.isLongTermMemoryEnabled()
+                || context.isSubAgent()
+                || !run.steps().isEmpty()) {
+            return "";
+        }
+        return longTermMemoryService.recall(run.prompt());
     }
 
     private String sessionHistory(AgentRun run, AgentContext context) {

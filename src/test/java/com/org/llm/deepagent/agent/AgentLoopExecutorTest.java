@@ -74,7 +74,11 @@ class AgentLoopExecutorTest {
                         new ObjectMapper(),
                         new SimpleMeterRegistry(),
                         synchronousExecutor,
-                        new PromptInjectionGuard(new InjectionGuardProperties()));
+                        new PromptInjectionGuard(new InjectionGuardProperties()),
+                        mock(com.org.llm.deepagent.memory.LongTermMemoryService.class),
+                        new com.org.llm.deepagent.config.FeatureFlagProperties());
+        // @PostConstruct doesn't fire outside a Spring context
+        executor.loadPromptTemplates();
     }
 
     @Test

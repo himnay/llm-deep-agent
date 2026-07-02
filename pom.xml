@@ -215,35 +215,6 @@
         </plugins>
     </build>
 
-    <profiles>
-        <!-- Run with: mvn -P security-scan verify
-             Kept out of the default lifecycle since it needs network access to the
-             NVD feed (or NVD_API_KEY) and isn't appropriate for offline/local builds. -->
-        <profile>
-            <id>security-scan</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.owasp</groupId>
-                        <artifactId>dependency-check-maven</artifactId>
-                        <configuration>
-                            <failBuildOnCVSS>8</failBuildOnCVSS>
-                            <formats>
-                                <format>HTML</format>
-                                <format>JSON</format>
-                            </formats>
-                        </configuration>
-                        <executions>
-                            <execution>
-                                <goals>
-                                    <goal>check</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
+    <!-- security-scan and mutation-test profiles are inherited from super-pom -->
 
 </project>

@@ -13,4 +13,5 @@ public class FeatureFlagProperties {
     private boolean ragRetrievalEnabled = true;
     private boolean auditLoggingEnabled = true;
     private boolean stepCompactionEnabled = true;
+    private boolean longTermMemoryEnabled = false;
 }

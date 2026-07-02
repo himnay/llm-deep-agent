@@ -70,6 +70,40 @@ public class GatewayClient {
                 .body(GatewayChatResponse.class);
     }
 
+    /**
+     * Computes a text embedding via {@code POST /embed}. Returns {@code null} on any failure —
+     * callers (long-term memory) treat a missing embedding as "skip", never as an error.
+     */
+    @Retry(name = "gateway", fallbackMethod = "embedFallback")
+    @CircuitBreaker(name = "gateway", fallbackMethod = "embedFallback")
+    public float[] embed(String text) {
+        GatewayEmbedResponse response =
+                restClient
+                        .post()
+                        .uri("/embed")
+                        .header("Authorization", "Bearer " + tokenService.getToken())
+                        .body(java.util.Map.of("text", text))
+                        .retrieve()
+                        .body(GatewayEmbedResponse.class);
+        if (response == null || response.embedding() == null) {
+            return null;
+        }
+        float[] vec = new float[response.embedding().size()];
+        for (int i = 0; i < vec.length; i++) {
+            vec[i] = response.embedding().get(i).floatValue();
+        }
+        return vec;
+    }
+
+    float[] embedFallback(String text, Throwable ex) {
+        log.warn("GATEWAY_CLIENT | embed unavailable | {}", ex.getMessage());
+        return null;
+    }
+
+    /** Minimal projection of llm-gateway-core's embedding response. */
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
+    record GatewayEmbedResponse(java.util.List<Double> embedding) {}
+
     GatewayChatResponse circuitBreakerFallback(
             String prompt, String systemPrompt, String sessionId, Throwable ex) {
         return fallback("circuit open", ex);

@@ -191,6 +191,29 @@ Runtime feature flags under `app.features.*` let individual capabilities be togg
 | `app.features.sub-agent-enabled`  | `SUB_AGENT_ENABLED`  | `true`  | Allow the `DELEGATE_SUBAGENT` action for nested ReAct runs                |
 | `app.features.file-io-enabled`    | `FILE_IO_ENABLED`    | `true`  | Allow `FILE_WRITE` and `FILE_READ` scratchpad actions                     |
 | `app.features.compaction-enabled` | `COMPACTION_ENABLED` | `true`  | Enable context compaction after `agent.compaction-trigger-steps` steps    |
+| `app.features.long-term-memory-enabled` | `LONG_TERM_MEMORY_ENABLED` | `false` | Distill facts from completed runs and recall them into future planner prompts |
+
+## Long-Term Memory
+
+When `app.features.long-term-memory-enabled=true`, a completed top-level run triggers one
+extra LLM call (async, off the run's hot path) that distills the question + final answer into
+at most `app.memory.max-facts-per-run` standalone facts. Each fact is embedded through
+llm-gateway `POST /embed` and stored in the `agent_memory` table.
+
+On a new run's first planning call, the objective is embedded and compared (cosine) against
+the newest `app.memory.candidate-limit` stored facts; the top `app.memory.recall-top-k`
+above `app.memory.min-similarity` are prepended to the planner prompt as
+"Relevant facts remembered from previous runs". Sub-agents never recall directly — they
+inherit whatever the parent planner passes down.
+
+Both paths are best-effort: gateway or DB failures degrade to "no memory", never a failed run.
+
+| Property | Env Var | Default |
+|---|---|---|
+| `app.memory.max-facts-per-run` | `MEMORY_MAX_FACTS_PER_RUN` | `5` |
+| `app.memory.recall-top-k` | `MEMORY_RECALL_TOP_K` | `5` |
+| `app.memory.min-similarity` | `MEMORY_MIN_SIMILARITY` | `0.75` |
+| `app.memory.candidate-limit` | `MEMORY_CANDIDATE_LIMIT` | `500` |
 
 ## Production Profile
 
