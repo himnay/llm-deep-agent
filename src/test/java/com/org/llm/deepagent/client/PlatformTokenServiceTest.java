@@ -1,6 +1,7 @@
 package com.org.llm.deepagent.client;
 
 import com.org.llm.deepagent.exception.TokenAcquisitionException;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -24,6 +25,7 @@ class PlatformTokenServiceTest {
     }
 
     @Test
+    @DisplayName("getToken() fetches a token from Keycloak then caches it until near expiry")
     void getTokenFetchesAndCachesUntilNearExpiry() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
@@ -43,6 +45,7 @@ class PlatformTokenServiceTest {
     }
 
     @Test
+    @DisplayName("getToken() throws TokenAcquisitionException when the response has no access_token")
     void getTokenThrowsWhenResponseHasNoAccessToken() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();

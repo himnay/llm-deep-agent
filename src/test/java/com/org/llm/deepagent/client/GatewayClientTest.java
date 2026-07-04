@@ -1,5 +1,6 @@
 package com.org.llm.deepagent.client;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -27,6 +28,7 @@ class GatewayClientTest {
     }
 
     @Test
+    @DisplayName("chat() posts to /chat with the bearer token and returns the parsed response")
     void chatPostsToSlashChatWithBearerTokenAndReturnsTheResponse() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
@@ -49,6 +51,7 @@ class GatewayClientTest {
     }
 
     @Test
+    @DisplayName("query() posts to /query and returns the planner's response content")
     void queryPostsToSlashQuery() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();

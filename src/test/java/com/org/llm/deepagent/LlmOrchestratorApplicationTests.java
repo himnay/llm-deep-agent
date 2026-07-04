@@ -1,5 +1,6 @@
 package com.org.llm.deepagent;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -24,6 +25,7 @@ class LlmOrchestratorApplicationTests {
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18");
 
     @Test
+    @DisplayName("the full Spring application context loads with MCP servers unreachable")
     void contextLoads(ApplicationContext context) {
         assertThat(context.getBean("filterChain")).isNotNull();
         assertThat(context.getBean("resilientToolCallbackProvider")).isNotNull();

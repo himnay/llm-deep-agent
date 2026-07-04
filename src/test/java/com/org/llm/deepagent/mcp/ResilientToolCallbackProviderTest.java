@@ -6,6 +6,7 @@ import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
@@ -37,6 +38,7 @@ class ResilientToolCallbackProviderTest {
     }
 
     @Test
+    @DisplayName("getToolCallbacks() wraps every delegate callback while preserving its tool definition")
     void wrapsEveryDelegateCallbackAndPreservesItsToolDefinition() {
         ToolCallback raw = toolNamed("getDeployments");
         ToolCallbackProvider delegate = mock(ToolCallbackProvider.class);
@@ -57,6 +59,7 @@ class ResilientToolCallbackProviderTest {
     }
 
     @Test
+    @DisplayName("call() delegates to the underlying tool and returns its result on success")
     void callDelegatesAndReturnsTheUnderlyingResultOnSuccess() {
         ToolCallback raw = toolNamed("getDeployments");
         when(raw.call("{}")).thenReturn("[]");
@@ -77,6 +80,7 @@ class ResilientToolCallbackProviderTest {
     }
 
     @Test
+    @DisplayName("call() wraps a failing delegate's exception in McpToolCallException")
     void callWrapsAFailingDelegateInMcpToolCallException() {
         ToolCallback raw = toolNamed("getDeployments");
         when(raw.call("{}")).thenThrow(new RuntimeException("downstream boom"));
@@ -97,6 +101,7 @@ class ResilientToolCallbackProviderTest {
     }
 
     @Test
+    @DisplayName("call() returns a structured error message when the circuit breaker is open")
     void callReturnsAStructuredErrorWhenTheCircuitIsOpen() {
         ToolCallback raw = toolNamed("getDeployments");
         when(raw.call("{}")).thenThrow(new RuntimeException("boom"));
@@ -122,6 +127,7 @@ class ResilientToolCallbackProviderTest {
     }
 
     @Test
+    @DisplayName("a tool with no configured resilience mapping falls back to the mcp-unknown circuit breaker instance")
     void unknownToolFallsBackToTheMcpUnknownResilienceInstance() {
         ToolCallback raw = toolNamed("someTool");
         ToolCallbackProvider delegate = mock(ToolCallbackProvider.class);
@@ -138,6 +144,7 @@ class ResilientToolCallbackProviderTest {
     }
 
     @Test
+    @DisplayName("the call() overload accepting a ToolContext also delegates to the underlying tool")
     void callWithToolContextOverloadAlsoDelegates() {
         ToolCallback raw = toolNamed("getDeployments");
         when(raw.call("{}", null)).thenReturn("[]");

@@ -1,5 +1,6 @@
 package com.org.llm.deepagent.client;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -26,6 +27,7 @@ class RagClientTest {
     }
 
     @Test
+    @DisplayName("retrieve() posts to /retrieve and parses the returned chunks and citations")
     void retrievePostsToSlashRetrieveAndParsesChunksAndCitations() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
@@ -49,6 +51,7 @@ class RagClientTest {
     }
 
     @Test
+    @DisplayName("generate() posts to /generate and returns the generated answer")
     void generatePostsToSlashGenerateAndReturnsTheAnswer() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
