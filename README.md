@@ -1,5 +1,7 @@
 # llm-deep-agent
 
+<img src="image/spring-logo.png" alt="logo" width="80"/>
+
 Autonomous agentic orchestration service, built on Spring Boot 4.1.0. `llm-deep-agent` (Maven
 artifact `llm-deep-agent`, Spring application name `llm-orchestrator`) runs multi-step **ReAct**
 (Reason + Act) loops that plan, call an LLM gateway, retrieve grounded context, invoke external
