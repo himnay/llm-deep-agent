@@ -41,7 +41,8 @@ Port: **8090** | Context path: `/orchestrator/v1` | Base API path: `/api/v1/agen
 
 ---
 
-## What is an agent orchestrator, and what problem does it solve?
+<a id="what-is-an-agent-orchestrator-and-what-problem-does-it-solve"></a>
+## 1. 🤖 What is an agent orchestrator, and what problem does it solve?
 
 A single LLM call is stateless and single-shot: you send a prompt, you get a completion, the
 interaction ends. Most non-trivial tasks — "find out why deployment X is stuck and reschedule it
@@ -92,7 +93,8 @@ Concretely, this service solves:
 
 ---
 
-## What is ReAct?
+<a id="what-is-react"></a>
+## 2. 💡 What is ReAct?
 
 **ReAct** stands for **Re**asoning + **Act**ing. It is a prompting pattern for LLM-based agents
 where the model alternates between two phases in a loop:
@@ -115,7 +117,8 @@ handle multi-step tasks the way a human analyst would, one step at a time.
 
 ---
 
-## System architecture
+<a id="system-architecture"></a>
+## 3. 🏗️ System architecture
 
 `llm-deep-agent` does not implement an LLM, a retriever, or any of the tools it calls — it composes
 calls to four other systems, each already deployed as its own service:
@@ -188,7 +191,8 @@ separate concerns (see [Security posture](#security-posture)).
 
 ---
 
-## The agent loop in detail
+<a id="the-agent-loop-in-detail"></a>
+## 4. 🤖 The agent loop in detail
 
 `AgentLoopExecutor.continueRun(long runId)` is the reentrant core. Every call re-derives all state
 for that run from `AgentRunRepository` — the run's status, its persisted `AgentStep`s, its token
@@ -264,7 +268,8 @@ leaving the row stuck at `RUNNING` forever.
 
 ---
 
-## Integration point: the gateway (`GatewayClient`, `PlatformTokenService`)
+<a id="integration-point-the-gateway-gatewayclient-platformtokenservice"></a>
+## 5. 🚪 Integration point: the gateway (`GatewayClient`, `PlatformTokenService`)
 
 `GatewayClient` (`src/main/java/com/org/llm/deepagent/client/GatewayClient.java`) is a thin
 `RestClient` wrapper over `llm-gateway-core`'s HTTP API. It is the **only** way this service talks
@@ -302,7 +307,8 @@ rather than surfacing as a runtime SSRF vector later (see [Security posture](#se
 
 ---
 
-## Integration point: RAG and hybrid RAG (`RagClient`, `GraphRagClient`)
+<a id="integration-point-rag-and-hybrid-rag-ragclient-graphragclient"></a>
+## 6. 🤖 Integration point: RAG and hybrid RAG (`RagClient`, `GraphRagClient`)
 
 `RagClient` wraps `llm-rag-pipeline`'s HTTP API (`POST /retrieve`, `POST /generate`), using the
 exact same `PlatformTokenService` token as `GatewayClient` (same Keycloak realm). Two actions route
@@ -342,7 +348,8 @@ build the planner LLM will not select them on its own.
 
 ---
 
-## Integration point: MCP tools (`ResilientToolCallbackProvider`, `McpTokenService`)
+<a id="integration-point-mcp-tools-resilienttoolcallbackprovider-mcptokenservice"></a>
+## 7. 🛡️ Integration point: MCP tools (`ResilientToolCallbackProvider`, `McpTokenService`)
 
 MCP (Model Context Protocol) tool servers are how this service reaches systems with real side
 effects — creating a GitHub issue, rescheduling a deployment, sending a notification. Spring AI's
@@ -393,7 +400,8 @@ token services rather than one shared one.
 
 ---
 
-## Long-term memory (`LongTermMemoryService`)
+<a id="long-term-memory-longtermmemoryservice"></a>
+## 8. 🧠 Long-term memory (`LongTermMemoryService`)
 
 Long-term memory is the one capability in this service that persists knowledge **across** runs
 rather than within a single run's transcript, and it's off by default
@@ -449,7 +457,8 @@ column, keeping the schema portable across Postgres versions without the pgvecto
 
 ---
 
-## Request lifecycle — sequence diagram
+<a id="request-lifecycle--sequence-diagram"></a>
+## 9. 🔹 Request lifecycle — sequence diagram
 
 The following traces one representative request end-to-end: a user asks a question that needs a
 tool call, the tool call needs human approval, and the run completes with long-term memory enabled.
@@ -531,7 +540,8 @@ sequenceDiagram
 
 ---
 
-## Human approval gate
+<a id="human-approval-gate"></a>
+## 10. 🔹 Human approval gate
 
 Certain actions require human sign-off before they're dispatched, configured independently for MCP
 and non-MCP actions:
@@ -557,7 +567,8 @@ rejected, by whom, with what reason) is recorded in `approval_audit`.
 
 ---
 
-## Sub-agent delegation
+<a id="sub-agent-delegation"></a>
+## 11. 🤖 Sub-agent delegation
 
 `DELEGATE_SUBAGENT` creates a nested run under the parent: `SubAgentRoutingStrategy` calls
 `AgentLoopExecutor.runSubAgentToCompletion(prompt, sessionId, parentRunId, rootRunId)`
@@ -595,7 +606,8 @@ is itself blocked on a human decision; `FAILED`/`RUNNING`/`CANCELLED` → an err
 
 ---
 
-## Context compaction
+<a id="context-compaction"></a>
+## 12. 🔹 Context compaction
 
 `ContextCompactor.buildTranscript(run, steps)` decides what the planner actually sees on each turn.
 Below `agent.compaction-trigger-steps` (default 8) persisted steps, every step is rendered verbatim.
@@ -622,7 +634,8 @@ without exhausting the planner's own context window.
 
 ---
 
-## Resilience: circuit breakers, retries, timeouts
+<a id="resilience-circuit-breakers-retries-timeouts"></a>
+## 13. 🛡️ Resilience: circuit breakers, retries, timeouts
 
 Every outbound call this service makes — to the gateway, to RAG, to graph-RAG, and to every MCP
 server — goes through Resilience4j, configured per named instance in `application.yaml`:
@@ -649,7 +662,8 @@ failure each map onto distinct, planner-legible observation strings rather than 
 
 ---
 
-## Security posture
+<a id="security-posture"></a>
+## 14. 🔐 Security posture
 
 **Layer 1 — Entry guard (`PromptInjectionGuard`).** The user's initial prompt is checked in
 `AgentLoopExecutor.startRun()` before any database row is written or any LLM call is made. Patterns
@@ -714,7 +728,8 @@ not as the end user.
 
 ---
 
-## Configuration reference
+<a id="configuration-reference"></a>
+## 15. 📚 Configuration reference
 
 All of the following live in `src/main/resources/application.yaml` unless noted; every property has
 an environment-variable override (shown) so none of this needs a rebuild to change per-environment.
@@ -774,7 +789,8 @@ an environment-variable override (shown) so none of this needs a rebuild to chan
 
 ---
 
-## Feature flags
+<a id="feature-flags"></a>
+## 16. 🔹 Feature flags
 
 Runtime feature flags under `app.features.*` (bound by `FeatureFlagProperties`) let individual
 capabilities be toggled without redeployment:
@@ -794,7 +810,8 @@ vector-only.
 
 ---
 
-## Operational concerns: recovery, retention, observability
+<a id="operational-concerns-recovery-retention-observability"></a>
+## 17. 📈 Operational concerns: recovery, retention, observability
 
 - **Crash recovery (`AgentRunRecoveryRunner`).** On startup, every `agent_run` row still `RUNNING`
   is — by definition, for a freshly booting single instance — orphaned by a previous process that
@@ -828,7 +845,8 @@ java -jar target/llm-deep-agent-*.jar --spring.profiles.active=prod
 
 ---
 
-## Known gaps and rough edges
+<a id="known-gaps-and-rough-edges"></a>
+## 18. ⚠️ Known gaps and rough edges
 
 Documented here rather than glossed over, since they're visible directly in the source:
 
@@ -856,7 +874,8 @@ Documented here rather than glossed over, since they're visible directly in the 
 
 ---
 
-## Port map and tech stack
+<a id="port-map-and-tech-stack"></a>
+## 19. 🧰 Port map and tech stack
 
 | Service          | Port      |
 |------------------|-----------|
