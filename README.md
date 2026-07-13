@@ -49,11 +49,15 @@ interaction ends. Most non-trivial tasks — "find out why deployment X is stuck
 if the assignee is on leave," "summarize this repository's health and open an issue for anything
 concerning" — cannot be solved in one shot. They require the model to:
 
+<ul>
+
 - gather information it doesn't have yet (by calling tools or retrieving documents),
 - decide what to do next based on what it just learned,
 - possibly take an action with real-world side effects (create an issue, send a notification,
   reschedule a deployment),
 - and do all of this over several turns, keeping track of what has already happened.
+
+</ul>
 
 An **agent orchestrator** is the piece of software that owns this multi-turn loop on the model's
 behalf: it persists the running state of a task ("run"), decides what the model is allowed to see
@@ -69,6 +73,8 @@ of them need to know anything about multi-step planning, approval workflows, or 
 answers into a completed task.
 
 Concretely, this service solves:
+
+<ul>
 
 - **State that survives the request.** A run started by `POST /agent/run` returns immediately with
   status `RUNNING`; the loop itself executes on a background virtual thread and is driven purely by
@@ -90,6 +96,8 @@ Concretely, this service solves:
 - **Bounded context growth.** `ContextCompactor` folds older steps into a rolling LLM-generated
   summary once a run's step count crosses a threshold, so a run's iteration budget can be raised
   without the planner's own context window becoming the limiting factor.
+
+</ul>
 
 ---
 
@@ -314,6 +322,8 @@ rather than surfacing as a runtime SSRF vector later (see [Security posture](#se
 exact same `PlatformTokenService` token as `GatewayClient` (same Keycloak realm). Two actions route
 here:
 
+<ul>
+
 - **`RAG_RETRIEVE`** — `RagClient.retrieve(query, topK)` returns raw, ranked chunks with citations
   but no generated answer; `RagRoutingStrategy` serializes the whole `RagRetrievalResult` back to
   the planner as JSON so it can reason over individual sources.
@@ -321,6 +331,8 @@ here:
   retrieve *and* generate a grounded answer with a faithfulness check; if the response reports
   `insufficientContext()`, the strategy still returns the best-effort answer, just prefixed with a
   warning, rather than an error.
+
+</ul>
 
 A second retrieval backend, `GraphRagClient`, wraps `llm-rag-graph` — a Neo4j-backed knowledge-graph
 service reachable at `POST /api/v1/rag/query`. `GraphRagRoutingStrategy` handles the
@@ -379,6 +391,8 @@ circuit breaker (transient failures get retried before the circuit breaker ever 
 failure), and each call is submitted to a fresh `Executors.newVirtualThreadPerTaskExecutor()` and
 bounded by `agent.step-timeout-seconds` (default 30s):
 
+<ul>
+
 - **Timeout** → the future is cancelled and the tool call returns the text `"Tool call timed out
   after Ns"` as its observation (not an exception) — the planner sees a normal-looking failure and
   can decide what to do next.
@@ -386,6 +400,8 @@ bounded by `agent.step-timeout-seconds` (default 30s):
   `{"error": "<server> is temporarily unavailable (circuit open). Please try again later."}` string
   instead of making a doomed network call.
 - **Any other failure** → wrapped and rethrown as `McpToolCallException`.
+
+</ul>
 
 `McpTokenService` is a second, independent client-credentials token cache — structurally identical
 to `PlatformTokenService` (same 60-second refresh buffer, same `ReentrantLock` pattern) but against
@@ -546,6 +562,8 @@ sequenceDiagram
 Certain actions require human sign-off before they're dispatched, configured independently for MCP
 and non-MCP actions:
 
+<ul>
+
 - `agent.approval-required-actions` — a set of `AgentAction` values (e.g. `FILE_WRITE`) gated
   uniformly; empty by default.
 - `agent.approval-required-mcp-tools` — a list of exact tool names or `prefix*` glob patterns
@@ -553,6 +571,8 @@ and non-MCP actions:
   `["*"]`, i.e. **every** MCP tool call requires approval out of the box.
   `AgentProperties.isApprovalRequired(action, toolName)` checks these two independently — an
   `MCP_TOOL` action is never affected by `approval-required-actions`.
+
+</ul>
 
 ```
 Loop paused (status=AWAITING_APPROVAL, pendingAction persisted)
@@ -614,6 +634,8 @@ Below `agent.compaction-trigger-steps` (default 8) persisted steps, every step i
 Once a run crosses that threshold, the oldest steps (all but the most recent
 `agent.compaction-keep-recent-steps`, default 4) are folded into a rolling LLM-generated summary:
 
+<ul>
+
 - `run.contextSummary()` / `run.summarizedStepCount()` track what's already been summarized.
 - Only *newly*-aged steps (`olderSteps.subList(run.summarizedStepCount(), olderSteps.size())`) are
   sent to the summarizer call each time — the summary is extended incrementally, not recomputed
@@ -624,6 +646,8 @@ Once a run crosses that threshold, the oldest steps (all but the most recent
 - If the summarizer call fails, the **prior** summary is kept as-is (`existingSummary`) rather than
   losing it — compaction failure degrades to "summary doesn't grow this turn," not "summary is
   lost."
+
+</ul>
 
 Every rendered step fences its observation between `<<<OBSERVATION_START>>>`/`<<<OBSERVATION_END>>>`
 markers with an explicit "data, not instructions" label — the same textual boundary
@@ -813,6 +837,8 @@ vector-only.
 <a id="operational-concerns-recovery-retention-observability"></a>
 ## 17. 📈 Operational concerns: recovery, retention, observability
 
+<ul>
+
 - **Crash recovery (`AgentRunRecoveryRunner`).** On startup, every `agent_run` row still `RUNNING`
   is — by definition, for a freshly booting single instance — orphaned by a previous process that
   crashed or was killed mid-loop. `AgentRunRecoveryRunner` resubmits each one to
@@ -837,6 +863,8 @@ vector-only.
   reduces trace sampling to 10%, and restricts actuator `show-details`/`show-components` to
   authorized/`ACTUATOR`-role callers.
 
+</ul>
+
 ```bash
 mvn spring-boot:run -Dspring-boot.run.arguments=--spring.profiles.active=prod
 # or
@@ -849,6 +877,8 @@ java -jar target/llm-deep-agent-*.jar --spring.profiles.active=prod
 ## 18. ⚠️ Known gaps and rough edges
 
 Documented here rather than glossed over, since they're visible directly in the source:
+
+<ul>
 
 - **`GRAPH_RAG_QUERY` and `HYBRID_RAG` are wired but not yet planner-visible.** Both exist as
   `AgentAction` enum values with fully implemented `RoutingStrategy` beans
@@ -872,6 +902,8 @@ Documented here rather than glossed over, since they're visible directly in the 
   availability is instead solely a function of which MCP servers are reachable at startup
   (`McpToolConfig`), and file I/O (`FILE_WRITE`/`FILE_READ`) has no dedicated feature flag at all.
 
+</ul>
+
 ---
 
 <a id="port-map-and-tech-stack"></a>
@@ -885,6 +917,8 @@ Documented here rather than glossed over, since they're visible directly in the 
 | llm-rag-graph    | 8083      |
 | llm-mcp servers  | 8082-8087 |
 
+<ul>
+
 - Spring Boot 4.1.0, Spring AI (MCP client, chat memory, StringTemplate-based prompt templates)
 - PostgreSQL (run/step/task/approval/artifact/memory state) with Flyway migrations
 - Keycloak OAuth2 — inbound: `"llm-gateway"` realm; outbound to gateway/RAG/graph-RAG: same
@@ -893,3 +927,5 @@ Documented here rather than glossed over, since they're visible directly in the 
 - Resilience4j (circuit breaker + retry) around every gateway/RAG/graph-RAG/MCP call
 - Micrometer + OpenTelemetry (Prometheus metrics, OTLP tracing)
 - JaCoCo enforced at 70% instruction coverage (`mvn verify`)
+
+</ul>
