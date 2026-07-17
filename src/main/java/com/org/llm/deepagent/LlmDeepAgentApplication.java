@@ -8,7 +8,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 @SpringBootApplication
 @ConfigurationPropertiesScan
-public class LlmDeepAgentApplication {
+class LlmDeepAgentApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(LlmDeepAgentApplication.class, args);
