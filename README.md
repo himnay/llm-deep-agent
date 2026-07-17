@@ -108,7 +108,7 @@ Concretely, this service solves:
 where the model alternates between two phases in a loop:
 
 | Phase      | What happens                                                                                                                                     |
-|------------|----------------------------------------------------------------------------------------------------------------------------------------------------|
+|------------|--------------------------------------------------------------------------------------------------------------------------------------------------|
 | **Reason** | The LLM looks at the goal and the history of what has happened so far, then decides what the single best next action is (and why).               |
 | **Act**    | That action is executed — calling a tool, querying a database, generating text, writing a file — and the result (the *observation*) is recorded. |
 
@@ -286,11 +286,11 @@ memory beans), but `openai.api-key` is a placeholder; no code path in this servi
 directly. `GatewayClient` exposes three operations, all of them Resilience4j-wrapped
 (`@Retry` + `@CircuitBreaker`, instance name `gateway`):
 
-| Method                     | Downstream endpoint | Used by                                                                 |
-|----------------------------|----------------------|--------------------------------------------------------------------------|
-| `chat(prompt, systemPrompt, sessionId)` | `POST /chat`  | `GatewayLlmRoutingStrategy` — the `GATEWAY_LLM` action                  |
-| `query(prompt, systemPrompt)`           | `POST /query` | `AgentLoopExecutor.plan(...)` (the planner call itself), `ContextCompactor.summarize(...)`, `LongTermMemoryService.remember/recall` |
-| `embed(text)`                           | `POST /embed` | `LongTermMemoryService` only, for both storing and recalling facts       |
+| Method                                  | Downstream endpoint | Used by                                                                                                                             |
+|-----------------------------------------|---------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| `chat(prompt, systemPrompt, sessionId)` | `POST /chat`        | `GatewayLlmRoutingStrategy` — the `GATEWAY_LLM` action                                                                              |
+| `query(prompt, systemPrompt)`           | `POST /query`       | `AgentLoopExecutor.plan(...)` (the planner call itself), `ContextCompactor.summarize(...)`, `LongTermMemoryService.remember/recall` |
+| `embed(text)`                           | `POST /embed`       | `LongTermMemoryService` only, for both storing and recalling facts                                                                  |
 
 Every one of these calls carries `Authorization: Bearer <token>` where the token comes from
 `PlatformTokenService.getToken()` — this service's own machine identity, not the caller's inbound
@@ -664,12 +664,12 @@ without exhausting the planner's own context window.
 Every outbound call this service makes — to the gateway, to RAG, to graph-RAG, and to every MCP
 server — goes through Resilience4j, configured per named instance in `application.yaml`:
 
-| Instance name(s)                          | Used by                              | Retry                          | Circuit breaker                                      |
-|--------------------------------------------|---------------------------------------|---------------------------------|--------------------------------------------------------|
-| `gateway`                                  | `GatewayClient`                       | 3 attempts, 1s base, ×2 backoff | window 10, 50% failure threshold, 30s open, 3 half-open probes |
-| `rag`                                      | `RagClient`                           | same as `gateway`                | same as `gateway`                                     |
-| `graph-rag`                                | `GraphRagClient`                      | same as `gateway`                | same as `gateway`                                     |
-| `mcp-deployment`, `mcp-github`, `mcp-unknown` | `ResilientToolCallbackProvider` (per configured MCP server name; unmapped tools fall back to `mcp-unknown`) | 2 attempts, 500ms | window 10, 50% failure threshold, 30s open |
+| Instance name(s)                              | Used by                                                                                                     | Retry                           | Circuit breaker                                                |
+|-----------------------------------------------|-------------------------------------------------------------------------------------------------------------|---------------------------------|----------------------------------------------------------------|
+| `gateway`                                     | `GatewayClient`                                                                                             | 3 attempts, 1s base, ×2 backoff | window 10, 50% failure threshold, 30s open, 3 half-open probes |
+| `rag`                                         | `RagClient`                                                                                                 | same as `gateway`               | same as `gateway`                                              |
+| `graph-rag`                                   | `GraphRagClient`                                                                                            | same as `gateway`               | same as `gateway`                                              |
+| `mcp-deployment`, `mcp-github`, `mcp-unknown` | `ResilientToolCallbackProvider` (per configured MCP server name; unmapped tools fall back to `mcp-unknown`) | 2 attempts, 500ms               | window 10, 50% failure threshold, 30s open                     |
 
 For the gateway/RAG/graph-RAG clients, `@Retry`+`@CircuitBreaker` are declarative annotations with
 explicit `fallbackMethod`s that return a structured "unavailable" response object
@@ -760,56 +760,56 @@ an environment-variable override (shown) so none of this needs a rebuild to chan
 
 ### Agent loop (`agent.*`)
 
-| Property | Env Var | Default | Meaning |
-|---|---|---|---|
-| `agent.max-iterations` | `AGENT_MAX_ITERATIONS` | `25` | Hard cap on loop iterations for a top-level run |
-| `agent.sub-agent-max-iterations` | `AGENT_SUBAGENT_MAX_ITERATIONS` | `6` | Hard cap for a `DELEGATE_SUBAGENT` run |
-| `agent.step-timeout-seconds` | `AGENT_STEP_TIMEOUT_SECONDS` | `30` | Per-MCP-tool-call timeout (also the resilience4j tool timeout) |
-| `agent.compaction-trigger-steps` | `AGENT_COMPACTION_TRIGGER_STEPS` | `8` | Step count above which older steps get folded into a summary |
-| `agent.compaction-keep-recent-steps` | `AGENT_COMPACTION_KEEP_RECENT_STEPS` | `4` | How many most-recent steps stay verbatim once compaction triggers |
-| `agent.approval-required-actions` | `AGENT_APPROVAL_REQUIRED_ACTIONS` | *(empty)* | Non-MCP `AgentAction`s that pause the run for approval |
-| `agent.approval-required-mcp-tools` | `AGENT_APPROVAL_REQUIRED_MCP_TOOLS` | `*` | MCP tool names/`prefix*` patterns requiring approval; `*` gates everything |
-| `agent.max-total-tokens` | `AGENT_MAX_TOTAL_TOKENS` | `200000` | Cumulative prompt+completion token budget per run before it's stopped `INCOMPLETE` |
-| `agent.retention-days` | `AGENT_RETENTION_DAYS` | `30` | How long a terminal top-level run is kept before `AgentRunRetentionJob` prunes it |
-| `agent.retention-cron-schedule` | `AGENT_RETENTION_CRON_SCHEDULE` | `0 0 3 * * *` | Cron schedule for the retention job |
-| `agent.session-history-limit` | `AGENT_SESSION_HISTORY_LIMIT` | `3` | How many prior runs for the same `sessionId` are summarized into a new run's first prompt |
-| `agent.max-tasks` | `AGENT_MAX_TASKS` | `50` | Max tasks a single `PLAN_TASKS` call may persist per run tree |
-| `agent.max-scratchpad-files` | `AGENT_MAX_SCRATCHPAD_FILES` | `20` | Max distinct scratchpad files per run tree |
-| `agent.max-scratchpad-file-chars` | `AGENT_MAX_SCRATCHPAD_FILE_CHARS` | `20000` | Max characters allowed in one scratchpad file |
+| Property                             | Env Var                              | Default       | Meaning                                                                                   |
+|--------------------------------------|--------------------------------------|---------------|-------------------------------------------------------------------------------------------|
+| `agent.max-iterations`               | `AGENT_MAX_ITERATIONS`               | `25`          | Hard cap on loop iterations for a top-level run                                           |
+| `agent.sub-agent-max-iterations`     | `AGENT_SUBAGENT_MAX_ITERATIONS`      | `6`           | Hard cap for a `DELEGATE_SUBAGENT` run                                                    |
+| `agent.step-timeout-seconds`         | `AGENT_STEP_TIMEOUT_SECONDS`         | `30`          | Per-MCP-tool-call timeout (also the resilience4j tool timeout)                            |
+| `agent.compaction-trigger-steps`     | `AGENT_COMPACTION_TRIGGER_STEPS`     | `8`           | Step count above which older steps get folded into a summary                              |
+| `agent.compaction-keep-recent-steps` | `AGENT_COMPACTION_KEEP_RECENT_STEPS` | `4`           | How many most-recent steps stay verbatim once compaction triggers                         |
+| `agent.approval-required-actions`    | `AGENT_APPROVAL_REQUIRED_ACTIONS`    | *(empty)*     | Non-MCP `AgentAction`s that pause the run for approval                                    |
+| `agent.approval-required-mcp-tools`  | `AGENT_APPROVAL_REQUIRED_MCP_TOOLS`  | `*`           | MCP tool names/`prefix*` patterns requiring approval; `*` gates everything                |
+| `agent.max-total-tokens`             | `AGENT_MAX_TOTAL_TOKENS`             | `200000`      | Cumulative prompt+completion token budget per run before it's stopped `INCOMPLETE`        |
+| `agent.retention-days`               | `AGENT_RETENTION_DAYS`               | `30`          | How long a terminal top-level run is kept before `AgentRunRetentionJob` prunes it         |
+| `agent.retention-cron-schedule`      | `AGENT_RETENTION_CRON_SCHEDULE`      | `0 0 3 * * *` | Cron schedule for the retention job                                                       |
+| `agent.session-history-limit`        | `AGENT_SESSION_HISTORY_LIMIT`        | `3`           | How many prior runs for the same `sessionId` are summarized into a new run's first prompt |
+| `agent.max-tasks`                    | `AGENT_MAX_TASKS`                    | `50`          | Max tasks a single `PLAN_TASKS` call may persist per run tree                             |
+| `agent.max-scratchpad-files`         | `AGENT_MAX_SCRATCHPAD_FILES`         | `20`          | Max distinct scratchpad files per run tree                                                |
+| `agent.max-scratchpad-file-chars`    | `AGENT_MAX_SCRATCHPAD_FILE_CHARS`    | `20000`       | Max characters allowed in one scratchpad file                                             |
 
 ### Downstream services
 
-| Property | Env Var | Default |
-|---|---|---|
-| `gateway.base-url` | `GATEWAY_BASE_URL` | `http://localhost:8080/llm/v1` |
-| `gateway.provider` | `GATEWAY_PROVIDER` | `openai` |
-| `rag.base-url` | `RAG_BASE_URL` | `http://localhost:8081/api/v1` |
-| `graph-rag.base-url` | `GRAPH_RAG_BASE_URL` | `http://localhost:8083/api/v1` |
-| `graph-rag.enabled` | `GRAPH_RAG_ENABLED` | `true` |
-| `platform.auth.token-uri` | `PLATFORM_OAUTH_TOKEN_URI` | `http://localhost:8081/realms/llm-gateway/protocol/openid-connect/token` |
-| `platform.auth.client-id` | `PLATFORM_OAUTH_CLIENT_ID` | `llm-orchestrator-client` |
-| `platform.auth.client-secret` | `PLATFORM_OAUTH_CLIENT_SECRET` | `llm-orchestrator-dev-secret` |
-| `mcp.oauth2.token-uri` | `MCP_OAUTH2_TOKEN_URI` | `http://localhost:8180/realms/org-mcp/protocol/openid-connect/token` |
-| `mcp.oauth2.client-id` | `MCP_OAUTH2_CLIENT_ID` | `llm-orchestrator` |
-| `mcp.oauth2.client-secret` | `MCP_OAUTH2_CLIENT_SECRET` | `llm-orchestrator-secret` |
-| `mcp.auth-token` | `MCP_AUTH_TOKEN` | *(empty)* — static bearer for non-OAuth2 MCP servers |
+| Property                      | Env Var                        | Default                                                                  |
+|-------------------------------|--------------------------------|--------------------------------------------------------------------------|
+| `gateway.base-url`            | `GATEWAY_BASE_URL`             | `http://localhost:8080/llm/v1`                                           |
+| `gateway.provider`            | `GATEWAY_PROVIDER`             | `openai`                                                                 |
+| `rag.base-url`                | `RAG_BASE_URL`                 | `http://localhost:8081/api/v1`                                           |
+| `graph-rag.base-url`          | `GRAPH_RAG_BASE_URL`           | `http://localhost:8083/api/v1`                                           |
+| `graph-rag.enabled`           | `GRAPH_RAG_ENABLED`            | `true`                                                                   |
+| `platform.auth.token-uri`     | `PLATFORM_OAUTH_TOKEN_URI`     | `http://localhost:8081/realms/llm-gateway/protocol/openid-connect/token` |
+| `platform.auth.client-id`     | `PLATFORM_OAUTH_CLIENT_ID`     | `llm-orchestrator-client`                                                |
+| `platform.auth.client-secret` | `PLATFORM_OAUTH_CLIENT_SECRET` | `llm-orchestrator-dev-secret`                                            |
+| `mcp.oauth2.token-uri`        | `MCP_OAUTH2_TOKEN_URI`         | `http://localhost:8180/realms/org-mcp/protocol/openid-connect/token`     |
+| `mcp.oauth2.client-id`        | `MCP_OAUTH2_CLIENT_ID`         | `llm-orchestrator`                                                       |
+| `mcp.oauth2.client-secret`    | `MCP_OAUTH2_CLIENT_SECRET`     | `llm-orchestrator-secret`                                                |
+| `mcp.auth-token`              | `MCP_AUTH_TOKEN`               | *(empty)* — static bearer for non-OAuth2 MCP servers                     |
 
 ### Long-term memory (`app.memory.*`)
 
-| Property | Env Var | Default |
-|---|---|---|
-| `app.memory.max-facts-per-run` | `MEMORY_MAX_FACTS_PER_RUN` | `5` |
-| `app.memory.recall-top-k` | `MEMORY_RECALL_TOP_K` | `5` |
-| `app.memory.min-similarity` | `MEMORY_MIN_SIMILARITY` | `0.75` |
-| `app.memory.candidate-limit` | `MEMORY_CANDIDATE_LIMIT` | `500` |
+| Property                       | Env Var                    | Default |
+|--------------------------------|----------------------------|---------|
+| `app.memory.max-facts-per-run` | `MEMORY_MAX_FACTS_PER_RUN` | `5`     |
+| `app.memory.recall-top-k`      | `MEMORY_RECALL_TOP_K`      | `5`     |
+| `app.memory.min-similarity`    | `MEMORY_MIN_SIMILARITY`    | `0.75`  |
+| `app.memory.candidate-limit`   | `MEMORY_CANDIDATE_LIMIT`   | `500`   |
 
 ### Inbound security
 
-| Property | Env Var | Default |
-|---|---|---|
-| `gateway-auth.enabled` | `GATEWAY_AUTH_ENABLED` | `true` |
-| `gateway-auth.cors.allowed-origins` | `GATEWAY_CORS_ORIGINS` | `http://localhost:3000,http://localhost:8080` |
-| `app.security.injection-guard.enabled` | `INJECTION_GUARD_ENABLED` | `true` |
+| Property                               | Env Var                   | Default                                       |
+|----------------------------------------|---------------------------|-----------------------------------------------|
+| `gateway-auth.enabled`                 | `GATEWAY_AUTH_ENABLED`    | `true`                                        |
+| `gateway-auth.cors.allowed-origins`    | `GATEWAY_CORS_ORIGINS`    | `http://localhost:3000,http://localhost:8080` |
+| `app.security.injection-guard.enabled` | `INJECTION_GUARD_ENABLED` | `true`                                        |
 
 ---
 
@@ -819,14 +819,14 @@ an environment-variable override (shown) so none of this needs a rebuild to chan
 Runtime feature flags under `app.features.*` (bound by `FeatureFlagProperties`) let individual
 capabilities be toggled without redeployment:
 
-| Property | Env Var | Default | Description |
-|---|---|---|---|
-| `app.features.human-approval-enabled` | `HUMAN_APPROVAL_ENABLED` | `true` | Master switch referenced alongside the per-tool `agent.approval-required-*` gating |
-| `app.features.sub-agent-delegation-enabled` | `SUB_AGENT_DELEGATION_ENABLED` | `true` | Allow the `DELEGATE_SUBAGENT` action |
-| `app.features.rag-retrieval-enabled` | `RAG_RETRIEVAL_ENABLED` | `true` | Allow `RAG_RETRIEVE`/`RAG_GENERATE` actions |
-| `app.features.audit-logging-enabled` | `AUDIT_LOGGING_ENABLED` | `true` | Approval audit trail logging |
-| `app.features.step-compaction-enabled` | `STEP_COMPACTION_ENABLED` | `true` | Enable `ContextCompactor` folding of older steps |
-| `app.features.long-term-memory-enabled` | `LONG_TERM_MEMORY_ENABLED` | `false` | Distill facts from completed top-level runs and recall them into future planner prompts |
+| Property                                    | Env Var                        | Default | Description                                                                             |
+|---------------------------------------------|--------------------------------|---------|-----------------------------------------------------------------------------------------|
+| `app.features.human-approval-enabled`       | `HUMAN_APPROVAL_ENABLED`       | `true`  | Master switch referenced alongside the per-tool `agent.approval-required-*` gating      |
+| `app.features.sub-agent-delegation-enabled` | `SUB_AGENT_DELEGATION_ENABLED` | `true`  | Allow the `DELEGATE_SUBAGENT` action                                                    |
+| `app.features.rag-retrieval-enabled`        | `RAG_RETRIEVAL_ENABLED`        | `true`  | Allow `RAG_RETRIEVE`/`RAG_GENERATE` actions                                             |
+| `app.features.audit-logging-enabled`        | `AUDIT_LOGGING_ENABLED`        | `true`  | Approval audit trail logging                                                            |
+| `app.features.step-compaction-enabled`      | `STEP_COMPACTION_ENABLED`      | `true`  | Enable `ContextCompactor` folding of older steps                                        |
+| `app.features.long-term-memory-enabled`     | `LONG_TERM_MEMORY_ENABLED`     | `false` | Distill facts from completed top-level runs and recall them into future planner prompts |
 
 `graph-rag.enabled` (above, under downstream services rather than `app.features`) independently
 controls whether `HybridRagRoutingStrategy` includes the graph-RAG fan-out at all, or falls back to
@@ -909,13 +909,13 @@ Documented here rather than glossed over, since they're visible directly in the 
 <a id="port-map-and-tech-stack"></a>
 ## 19. 🧰 Port map and tech stack
 
-| Service          | Port      |
-|------------------|-----------|
+| Service                       | Port      |
+|-------------------------------|-----------|
 | llm-deep-agent (this service) | 8090      |
-| llm-gateway-core | 8080      |
-| llm-rag-pipeline | 8081      |
-| llm-rag-graph    | 8083      |
-| llm-mcp servers  | 8082-8087 |
+| llm-gateway-core              | 8080      |
+| llm-rag-pipeline              | 8081      |
+| llm-rag-graph                 | 8083      |
+| llm-mcp servers               | 8082-8087 |
 
 <ul>
 
