@@ -12,10 +12,12 @@ import java.util.Map;
 public record ApiError(
         Instant timestamp, int status, String error, String message, Map<String, String> fieldErrors) {
 
+    /** Returns the of. */
     public static ApiError of(int status, String error, String message) {
         return new ApiError(Instant.now(), status, error, message, null);
     }
 
+    /** Returns the of. */
     public static ApiError of(
             int status, String error, String message, Map<String, String> fieldErrors) {
         return new ApiError(Instant.now(), status, error, message, fieldErrors);

@@ -23,6 +23,7 @@ public class MemoryRepository {
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
 
+    /** Saves. */
     public void save(Long sourceRunId, String sessionId, String createdBy, String content, float[] embedding) {
         String embeddingJson = null;
         if (embedding != null) {

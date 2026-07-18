@@ -6,11 +6,11 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 @Schema(description = "One plan/act/observe iteration of an agent run.")
 public record AgentStepResponse(
-        @Schema(description = "Which kind of step this was.") AgentAction action,
-        @Schema(description = "What this step produced, fed into the next planning turn.")
         @Schema(description = "Zero-based position of this step within its run.") int stepIndex,
-        @Schema(description = "The query/prompt/tool-arguments given for this step.") String input,
+        @Schema(description = "Which kind of step this was.") AgentAction action,
         @Schema(description = "The MCP tool name, only set when action is MCP_TOOL.") String toolName,
+        @Schema(description = "The query/prompt/tool-arguments given for this step.") String input,
+        @Schema(description = "What this step produced, fed into the next planning turn.")
         String observation,
         @Schema(description = "The planner's one-line rationale for choosing this action.")
         String reasoning) {

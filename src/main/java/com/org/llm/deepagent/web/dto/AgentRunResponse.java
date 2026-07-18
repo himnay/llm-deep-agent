@@ -12,10 +12,10 @@ import java.util.List;
 @Schema(description = "The current state of one agent run.")
 public record AgentRunResponse(
         @Schema(description = "Numeric id of this run.") Long runId,
-        @Schema(description = "Current lifecycle state of the run.") AgentRunStatus status,
-        @Schema(description = "The planner's final answer once status is COMPLETED/INCOMPLETE.")
         @Schema(description = "Caller-supplied conversation identifier, if any.") String sessionId,
         @Schema(description = "The original task/question this run was started with.") String prompt,
+        @Schema(description = "Current lifecycle state of the run.") AgentRunStatus status,
+        @Schema(description = "The planner's final answer once status is COMPLETED/INCOMPLETE.")
         String finalAnswer,
         @Schema(description = "Every plan/act/observe step taken so far, in order.")
         List<AgentStepResponse> steps,

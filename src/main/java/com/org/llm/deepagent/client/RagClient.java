@@ -35,6 +35,7 @@ public class RagClient {
         this.restClient = restClientBuilder.baseUrl(properties.getBaseUrl()).build();
     }
 
+    /** Returns the retrieve. */
     @Retry(name = "rag", fallbackMethod = "retrieveFallback")
     @CircuitBreaker(name = "rag", fallbackMethod = "retrieveCircuitFallback")
     public RagRetrievalResult retrieve(String query, Integer topK) {
@@ -47,6 +48,7 @@ public class RagClient {
                 .body(RagRetrievalResult.class);
     }
 
+    /** Generates. */
     @Retry(name = "rag", fallbackMethod = "generateFallback")
     @CircuitBreaker(name = "rag", fallbackMethod = "generateCircuitFallback")
     public RagGenerateResponse generate(String query, Integer topK, String conversationId) {

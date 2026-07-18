@@ -7,9 +7,9 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @Schema(description = "An action the planner chose, shown when a run is awaiting human approval.")
 public record PlannedActionResponse(
         @Schema(description = "Which kind of step this is.") AgentAction action,
-        @Schema(description = "The planner's one-line rationale for choosing this action.")
-        @Schema(description = "The query/prompt/tool-arguments for this step.") String input,
         @Schema(description = "The MCP tool name, only set when action is MCP_TOOL.") String toolName,
+        @Schema(description = "The query/prompt/tool-arguments for this step.") String input,
+        @Schema(description = "The planner's one-line rationale for choosing this action.")
         String reasoning) {
 
     /**

@@ -33,6 +33,7 @@ public class GraphRagClient {
         this.restClient = restClientBuilder.baseUrl(properties.getBaseUrl()).build();
     }
 
+    /** Queries. */
     @Retry(name = "graph-rag", fallbackMethod = "queryFallback")
     @CircuitBreaker(name = "graph-rag", fallbackMethod = "queryCircuitFallback")
     public GraphRagResponse query(String question) {

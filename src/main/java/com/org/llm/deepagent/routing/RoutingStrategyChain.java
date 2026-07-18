@@ -17,6 +17,7 @@ public class RoutingStrategyChain {
 
     private final List<RoutingStrategy> strategies;
 
+    /** Dispatches. */
     public StepResult dispatch(AgentContext context, PlannedAction plannedAction) {
         return strategies.stream()
                 .filter(s -> s.supports(plannedAction.action()))

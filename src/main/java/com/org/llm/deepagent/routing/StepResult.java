@@ -5,10 +5,12 @@ package com.org.llm.deepagent.routing;
  */
 public record StepResult(String observation, boolean success) {
 
+    /** Returns the ok. */
     public static StepResult ok(String observation) {
         return new StepResult(observation, true);
     }
 
+    /** Returns the error. */
     public static StepResult error(String observation) {
         return new StepResult(observation, false);
     }

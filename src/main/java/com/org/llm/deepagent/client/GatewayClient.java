@@ -35,6 +35,7 @@ public class GatewayClient {
         this.restClient = restClientBuilder.baseUrl(properties.getBaseUrl()).build();
     }
 
+    /** Chats. */
     @Retry(name = "gateway", fallbackMethod = "retryFallback")
     @CircuitBreaker(name = "gateway", fallbackMethod = "circuitBreakerFallback")
     public GatewayChatResponse chat(String prompt, String systemPrompt, String sessionId) {

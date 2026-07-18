@@ -15,6 +15,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class JacksonConfig {
 
+    /** Defines the object mapper bean. */
     @Bean
     public ObjectMapper objectMapper() {
         return new ObjectMapper();

@@ -10,6 +10,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @ConfigurationPropertiesScan
 class LlmDeepAgentApplication {
 
+    /** Application entry point. */
     public static void main(String[] args) {
         SpringApplication.run(LlmDeepAgentApplication.class, args);
     }
