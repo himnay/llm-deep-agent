@@ -35,11 +35,11 @@ import java.util.List;
  * with {@code ROLE_ADMIN} — see {@link #requireAccessibleRun}. Runs created before this restriction
  * existed (a {@code null createdBy}) remain unrestricted.
  */
-@Tag(name = "Agent")
 @Slf4j
 @RestController
-@RequestMapping("/api/v1/agent")
+@Tag(name = "Agent")
 @RequiredArgsConstructor
+@RequestMapping("/api/v1/agent")
 public class AgentController {
 
     private static final String ADMIN_AUTHORITY = "ROLE_ADMIN";
