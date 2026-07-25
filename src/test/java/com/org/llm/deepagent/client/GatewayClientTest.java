@@ -19,7 +19,11 @@ class GatewayClientTest {
 
     private final GatewayProperties properties = new GatewayProperties();
     private final PlatformTokenService tokenService = mock(PlatformTokenService.class);
-    private final UrlAllowlistValidator urlValidator = new UrlAllowlistValidator();
+
+    // Real UrlAllowlistValidator does a live DNS lookup, which this fake "gateway.test" host
+    // will never resolve — GatewayClientTest exercises GatewayClient, not the validator (that
+    // has its own coverage), so the validator is mocked like every other collaborator here.
+    private final UrlAllowlistValidator urlValidator = mock(UrlAllowlistValidator.class);
 
     {
         properties.setBaseUrl("http://gateway.test/llm/v1");

@@ -25,6 +25,12 @@ class ContextCompactorTest {
     private final ContextCompactor compactor =
             new ContextCompactor(gatewayClient, agentRunRepository, agentProperties);
 
+    {
+        // Outside a Spring context @PostConstruct never fires, so the compactor's prompt
+        // templates would stay null; load them explicitly the same way Spring would at startup.
+        compactor.loadPromptTemplates();
+    }
+
     private static AgentStep step(int index, String observation) {
         return new AgentStep(
                 null,

@@ -1,6 +1,8 @@
 package com.org.llm.deepagent.security;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Component;
 
 import java.net.InetAddress;
@@ -19,6 +21,20 @@ import java.util.Set;
 public class UrlAllowlistValidator {
 
     private static final Set<String> ALLOWED_SCHEMES = Set.of("http", "https");
+
+    /**
+     * Under the {@code test} profile, every downstream platform service (llm-gateway-core,
+     * llm-rag-pipeline, ...) legitimately runs on {@code localhost} — that's the whole point of
+     * the local/test stack, not an attacker-controlled value. Real deployments always resolve
+     * these base URLs to real hosts via env vars, so this carve-out never applies outside tests.
+     */
+    private static final String TEST_PROFILE = "test";
+
+    private final Environment environment;
+
+    public UrlAllowlistValidator(Environment environment) {
+        this.environment = environment;
+    }
 
     /**
      * Validates that {@code url} has an allowed scheme and a non-blank host.
@@ -51,10 +67,16 @@ public class UrlAllowlistValidator {
         }
         try {
             InetAddress addr = InetAddress.getByName(host);
-            if (addr.isLoopbackAddress() || addr.isLinkLocalAddress()
-                    || addr.isSiteLocalAddress() || addr.isMulticastAddress()) {
+            boolean isPrivateOrReserved = addr.isLoopbackAddress() || addr.isLinkLocalAddress()
+                    || addr.isSiteLocalAddress() || addr.isMulticastAddress();
+            if (isPrivateOrReserved && !environment.acceptsProfiles(Profiles.of(TEST_PROFILE))) {
                 throw new IllegalArgumentException(
                         "SSRF | " + fieldName + " resolves to a private/reserved address: " + host);
+            }
+            if (isPrivateOrReserved) {
+                log.debug(
+                        "SSRF | {} resolves to a private/reserved address ({}) — allowed under the '{}' profile",
+                        fieldName, host, TEST_PROFILE);
             }
         } catch (UnknownHostException e) {
             throw new IllegalArgumentException(
