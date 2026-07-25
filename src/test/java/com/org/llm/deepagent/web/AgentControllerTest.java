@@ -126,7 +126,7 @@ class AgentControllerTest {
 
         mockMvc
                 .perform(
-                        post("/agent/run")
+                        post("/api/v1/agent/run")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(new AgentRunRequest("hi", "s1"))))
                 .andExpect(status().isOk())
@@ -139,7 +139,7 @@ class AgentControllerTest {
     void runWithBlankPromptReturns400() throws Exception {
         mockMvc
                 .perform(
-                        post("/agent/run").contentType(MediaType.APPLICATION_JSON).content("{\"prompt\":\"\"}"))
+                        post("/api/v1/agent/run").contentType(MediaType.APPLICATION_JSON).content("{\"prompt\":\"\"}"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -152,7 +152,7 @@ class AgentControllerTest {
         when(agentRunRepository.findById(7L)).thenReturn(run);
 
         mockMvc
-                .perform(get("/agent/run/7"))
+                .perform(get("/api/v1/agent/run/7"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.runId").value(7))
                 .andExpect(jsonPath("$.finalAnswer").value("final answer"))
@@ -164,7 +164,7 @@ class AgentControllerTest {
     void getRunReturns404WhenMissing() throws Exception {
         when(agentRunRepository.findById(99L)).thenReturn(null);
 
-        mockMvc.perform(get("/agent/run/99")).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/agent/run/99")).andExpect(status().isNotFound());
     }
 
     @Test
@@ -174,7 +174,7 @@ class AgentControllerTest {
         when(agentRunRepository.findById(7L)).thenReturn(run);
         authenticateAs("someone-else");
 
-        mockMvc.perform(get("/agent/run/7")).andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/agent/run/7")).andExpect(status().isForbidden());
     }
 
     @Test
@@ -184,7 +184,7 @@ class AgentControllerTest {
         when(agentRunRepository.findById(7L)).thenReturn(run);
         authenticateAs("someone-else", new SimpleGrantedAuthority("ROLE_ADMIN"));
 
-        mockMvc.perform(get("/agent/run/7")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/agent/run/7")).andExpect(status().isOk());
     }
 
     @Test
@@ -194,7 +194,7 @@ class AgentControllerTest {
 
         mockMvc
                 .perform(
-                        post("/agent/run")
+                        post("/api/v1/agent/run")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(new AgentRunRequest("hi", null))))
                 .andExpect(status().isInternalServerError());
@@ -208,7 +208,7 @@ class AgentControllerTest {
         when(agentLoopExecutor.approve(eq(7L), any())).thenReturn(run);
 
         mockMvc
-                .perform(post("/agent/run/7/approve"))
+                .perform(post("/api/v1/agent/run/7/approve"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("RUNNING"));
     }
@@ -221,7 +221,7 @@ class AgentControllerTest {
         when(agentLoopExecutor.approve(eq(7L), any()))
                 .thenThrow(new InvalidRunStateException("not awaiting approval"));
 
-        mockMvc.perform(post("/agent/run/7/approve")).andExpect(status().isConflict());
+        mockMvc.perform(post("/api/v1/agent/run/7/approve")).andExpect(status().isConflict());
     }
 
     @Test
@@ -233,7 +233,7 @@ class AgentControllerTest {
 
         mockMvc
                 .perform(
-                        post("/agent/run/7/reject")
+                        post("/api/v1/agent/run/7/reject")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"reason\":\"too risky\"}"))
                 .andExpect(status().isOk())
@@ -249,7 +249,7 @@ class AgentControllerTest {
         when(agentLoopExecutor.cancel(7L)).thenReturn(cancelled);
 
         mockMvc
-                .perform(post("/agent/run/7/cancel"))
+                .perform(post("/api/v1/agent/run/7/cancel"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("CANCELLED"));
     }
@@ -264,7 +264,7 @@ class AgentControllerTest {
                         Optional.of(new AgentArtifact(1L, 7L, "notes.md", "hello scratchpad", Instant.now())));
 
         mockMvc
-                .perform(get("/agent/run/7/files/notes.md"))
+                .perform(get("/api/v1/agent/run/7/files/notes.md"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").value("hello scratchpad"));
     }
@@ -277,7 +277,7 @@ class AgentControllerTest {
         when(agentArtifactRepository.findByRootRunIdAndPath(7L, "missing.md"))
                 .thenReturn(Optional.empty());
 
-        mockMvc.perform(get("/agent/run/7/files/missing.md")).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/agent/run/7/files/missing.md")).andExpect(status().isNotFound());
     }
 
     @Test
@@ -285,6 +285,6 @@ class AgentControllerTest {
     void streamReturns404WhenMissing() throws Exception {
         when(agentRunRepository.findById(anyLong())).thenReturn(null);
 
-        mockMvc.perform(get("/agent/run/99/events")).andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/agent/run/99/events")).andExpect(status().isNotFound());
     }
 }
