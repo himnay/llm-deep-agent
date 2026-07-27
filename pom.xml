@@ -40,7 +40,6 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
-        <!-- Agent planner LLM + MCP tool client -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
             <artifactId>spring-ai-starter-model-openai</artifactId>
@@ -58,7 +57,6 @@
             <artifactId>spring-ai-template-st</artifactId>
         </dependency>
 
-        <!-- Run/step audit trail -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-jdbc</artifactId>
@@ -81,7 +79,6 @@
             <artifactId>flyway-database-postgresql</artifactId>
         </dependency>
 
-        <!-- Resilience around downstream HTTP/MCP calls -->
         <dependency>
             <groupId>io.github.resilience4j</groupId>
             <artifactId>resilience4j-spring-boot3</artifactId>
@@ -95,7 +92,6 @@
             <artifactId>resilience4j-retry</artifactId>
         </dependency>
 
-        <!-- Observability -->
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
@@ -104,7 +100,6 @@
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-tracing-bridge-otel</artifactId>
         </dependency>
-        <!-- Propagates MDC/trace context onto agentRunExecutor's virtual threads (see AgentExecutorConfig) -->
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>context-propagation</artifactId>
@@ -126,7 +121,6 @@
             <artifactId>logstash-logback-encoder</artifactId>
         </dependency>
 
-        <!-- OpenAPI / Swagger UI — version managed by learning-bom -->
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
@@ -155,7 +149,6 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
-        <!-- Spring Boot 4 moved @WebMvcTest to a dedicated module -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc-test</artifactId>
@@ -214,7 +207,5 @@
             </plugin>
         </plugins>
     </build>
-
-    <!-- security-scan and mutation-test profiles are inherited from super-pom -->
 
 </project>
