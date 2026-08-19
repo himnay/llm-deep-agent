@@ -1,4 +1,4 @@
-# <span style="color:hsl(290,68%,44%)">llm-deep-agent</span>
+# <span style="color:hsl(290,80%,58%)">llm-deep-agent</span>
 
 <img src="image/spring-logo.png" alt="logo" width="80"/>
 
@@ -17,7 +17,7 @@ Port: **8090** | Context path: `/orchestrator/v1` | Base API path: `/api/v1/agen
 
 ---
 
-## <span style="color:hsl(304,68%,44%)">Table of Contents</span>
+## <span style="color:hsl(68,80%,50%)">Table of Contents</span>
 
 1. 🤖 [What is an agent orchestrator, and what problem does it solve?](#what-is-an-agent-orchestrator-and-what-problem-does-it-solve)
 2. 💡 [What is ReAct?](#what-is-react)
@@ -42,7 +42,7 @@ Port: **8090** | Context path: `/orchestrator/v1` | Base API path: `/api/v1/agen
 ---
 
 <a id="what-is-an-agent-orchestrator-and-what-problem-does-it-solve"></a>
-## <span style="color:hsl(319,68%,44%)">1. 🤖 What is an agent orchestrator, and what problem does it solve?</span>
+## <span style="color:hsl(205,80%,58%)">1. 🤖 What is an agent orchestrator, and what problem does it solve?</span>
 
 A single LLM call is stateless and single-shot: you send a prompt, you get a completion, the
 interaction ends. Most non-trivial tasks — "find out why deployment X is stuck and reschedule it
@@ -102,7 +102,7 @@ Concretely, this service solves:
 ---
 
 <a id="what-is-react"></a>
-## <span style="color:hsl(333,68%,44%)">2. 💡 What is ReAct?</span>
+## <span style="color:hsl(343,80%,58%)">2. 💡 What is ReAct?</span>
 
 **ReAct** stands for **Re**asoning + **Act**ing. It is a prompting pattern for LLM-based agents
 where the model alternates between two phases in a loop:
@@ -126,7 +126,7 @@ handle multi-step tasks the way a human analyst would, one step at a time.
 ---
 
 <a id="system-architecture"></a>
-## <span style="color:hsl(348,68%,44%)">3. 🏗️ System architecture</span>
+## <span style="color:hsl(120,80%,58%)">3. 🏗️ System architecture</span>
 
 `llm-deep-agent` does not implement an LLM, a retriever, or any of the tools it calls — it composes
 calls to four other systems, each already deployed as its own service:
@@ -200,7 +200,7 @@ separate concerns (see [Security posture](#security-posture)).
 ---
 
 <a id="the-agent-loop-in-detail"></a>
-## <span style="color:hsl(2,68%,44%)">4. 🤖 The agent loop in detail</span>
+## <span style="color:hsl(258,80%,58%)">4. 🤖 The agent loop in detail</span>
 
 `AgentLoopExecutor.continueRun(long runId)` is the reentrant core. Every call re-derives all state
 for that run from `AgentRunRepository` — the run's status, its persisted `AgentStep`s, its token
@@ -277,7 +277,7 @@ leaving the row stuck at `RUNNING` forever.
 ---
 
 <a id="integration-point-the-gateway-gatewayclient-platformtokenservice"></a>
-## <span style="color:hsl(16,68%,44%)">5. 🚪 Integration point: the gateway (`GatewayClient`, `PlatformTokenService`)</span>
+## <span style="color:hsl(35,80%,58%)">5. 🚪 Integration point: the gateway (`GatewayClient`, `PlatformTokenService`)</span>
 
 `GatewayClient` (`src/main/java/com/org/llm/deepagent/client/GatewayClient.java`) is a thin
 `RestClient` wrapper over `llm-gateway-core`'s HTTP API. It is the **only** way this service talks
@@ -316,7 +316,7 @@ rather than surfacing as a runtime SSRF vector later (see [Security posture](#se
 ---
 
 <a id="integration-point-rag-and-hybrid-rag-ragclient-graphragclient"></a>
-## <span style="color:hsl(31,68%,44%)">6. 🤖 Integration point: RAG and hybrid RAG (`RagClient`, `GraphRagClient`)</span>
+## <span style="color:hsl(173,80%,58%)">6. 🤖 Integration point: RAG and hybrid RAG (`RagClient`, `GraphRagClient`)</span>
 
 `RagClient` wraps `llm-rag-pipeline`'s HTTP API (`POST /retrieve`, `POST /generate`), using the
 exact same `PlatformTokenService` token as `GatewayClient` (same Keycloak realm). Two actions route
@@ -361,7 +361,7 @@ build the planner LLM will not select them on its own.
 ---
 
 <a id="integration-point-mcp-tools-resilienttoolcallbackprovider-mcptokenservice"></a>
-## <span style="color:hsl(45,68%,32%)">7. 🛡️ Integration point: MCP tools (`ResilientToolCallbackProvider`, `McpTokenService`)</span>
+## <span style="color:hsl(310,80%,58%)">7. 🛡️ Integration point: MCP tools (`ResilientToolCallbackProvider`, `McpTokenService`)</span>
 
 MCP (Model Context Protocol) tool servers are how this service reaches systems with real side
 effects — creating a GitHub issue, rescheduling a deployment, sending a notification. Spring AI's
@@ -417,7 +417,7 @@ token services rather than one shared one.
 ---
 
 <a id="long-term-memory-longtermmemoryservice"></a>
-## <span style="color:hsl(60,68%,32%)">8. 🧠 Long-term memory (`LongTermMemoryService`)</span>
+## <span style="color:hsl(88,80%,58%)">8. 🧠 Long-term memory (`LongTermMemoryService`)</span>
 
 Long-term memory is the one capability in this service that persists knowledge **across** runs
 rather than within a single run's transcript, and it's off by default
@@ -474,7 +474,7 @@ column, keeping the schema portable across Postgres versions without the pgvecto
 ---
 
 <a id="request-lifecycle--sequence-diagram"></a>
-## <span style="color:hsl(74,68%,32%)">9. 🔹 Request lifecycle — sequence diagram</span>
+## <span style="color:hsl(225,80%,58%)">9. 🔹 Request lifecycle — sequence diagram</span>
 
 The following traces one representative request end-to-end: a user asks a question that needs a
 tool call, the tool call needs human approval, and the run completes with long-term memory enabled.
@@ -557,7 +557,7 @@ sequenceDiagram
 ---
 
 <a id="human-approval-gate"></a>
-## <span style="color:hsl(88,68%,32%)">10. 🔹 Human approval gate</span>
+## <span style="color:hsl(3,80%,58%)">10. 🔹 Human approval gate</span>
 
 Certain actions require human sign-off before they're dispatched, configured independently for MCP
 and non-MCP actions:
@@ -588,7 +588,7 @@ rejected, by whom, with what reason) is recorded in `approval_audit`.
 ---
 
 <a id="sub-agent-delegation"></a>
-## <span style="color:hsl(103,68%,32%)">11. 🤖 Sub-agent delegation</span>
+## <span style="color:hsl(140,80%,58%)">11. 🤖 Sub-agent delegation</span>
 
 `DELEGATE_SUBAGENT` creates a nested run under the parent: `SubAgentRoutingStrategy` calls
 `AgentLoopExecutor.runSubAgentToCompletion(prompt, sessionId, parentRunId, rootRunId)`
@@ -627,7 +627,7 @@ is itself blocked on a human decision; `FAILED`/`RUNNING`/`CANCELLED` → an err
 ---
 
 <a id="context-compaction"></a>
-## <span style="color:hsl(117,68%,32%)">12. 🔹 Context compaction</span>
+## <span style="color:hsl(278,80%,58%)">12. 🔹 Context compaction</span>
 
 `ContextCompactor.buildTranscript(run, steps)` decides what the planner actually sees on each turn.
 Below `agent.compaction-trigger-steps` (default 8) persisted steps, every step is rendered verbatim.
@@ -659,7 +659,7 @@ without exhausting the planner's own context window.
 ---
 
 <a id="resilience-circuit-breakers-retries-timeouts"></a>
-## <span style="color:hsl(132,68%,32%)">13. 🛡️ Resilience: circuit breakers, retries, timeouts</span>
+## <span style="color:hsl(55,80%,50%)">13. 🛡️ Resilience: circuit breakers, retries, timeouts</span>
 
 Every outbound call this service makes — to the gateway, to RAG, to graph-RAG, and to every MCP
 server — goes through Resilience4j, configured per named instance in `application.yaml`:
@@ -687,7 +687,7 @@ failure each map onto distinct, planner-legible observation strings rather than 
 ---
 
 <a id="security-posture"></a>
-## <span style="color:hsl(146,68%,32%)">14. 🔐 Security posture</span>
+## <span style="color:hsl(193,80%,58%)">14. 🔐 Security posture</span>
 
 **Layer 1 — Entry guard (`PromptInjectionGuard`).** The user's initial prompt is checked in
 `AgentLoopExecutor.startRun()` before any database row is written or any LLM call is made. Patterns
@@ -753,12 +753,12 @@ not as the end user.
 ---
 
 <a id="configuration-reference"></a>
-## <span style="color:hsl(160,68%,36%)">15. 📚 Configuration reference</span>
+## <span style="color:hsl(330,80%,58%)">15. 📚 Configuration reference</span>
 
 All of the following live in `src/main/resources/application.yaml` unless noted; every property has
 an environment-variable override (shown) so none of this needs a rebuild to change per-environment.
 
-### <span style="color:hsl(175,68%,36%)">Agent loop (`agent.*`)</span>
+### <span style="color:hsl(108,80%,58%)">Agent loop (`agent.*`)</span>
 
 | Property                             | Env Var                              | Default       | Meaning                                                                                   |
 |--------------------------------------|--------------------------------------|---------------|-------------------------------------------------------------------------------------------|
@@ -777,7 +777,7 @@ an environment-variable override (shown) so none of this needs a rebuild to chan
 | `agent.max-scratchpad-files`         | `AGENT_MAX_SCRATCHPAD_FILES`         | `20`          | Max distinct scratchpad files per run tree                                                |
 | `agent.max-scratchpad-file-chars`    | `AGENT_MAX_SCRATCHPAD_FILE_CHARS`    | `20000`       | Max characters allowed in one scratchpad file                                             |
 
-### <span style="color:hsl(189,68%,36%)">Downstream services</span>
+### <span style="color:hsl(245,80%,58%)">Downstream services</span>
 
 | Property                      | Env Var                        | Default                                                                  |
 |-------------------------------|--------------------------------|--------------------------------------------------------------------------|
@@ -794,7 +794,7 @@ an environment-variable override (shown) so none of this needs a rebuild to chan
 | `mcp.oauth2.client-secret`    | `MCP_OAUTH2_CLIENT_SECRET`     | `llm-orchestrator-secret`                                                |
 | `mcp.auth-token`              | `MCP_AUTH_TOKEN`               | *(empty)* — static bearer for non-OAuth2 MCP servers                     |
 
-### <span style="color:hsl(204,68%,44%)">Long-term memory (`app.memory.*`)</span>
+### <span style="color:hsl(23,80%,58%)">Long-term memory (`app.memory.*`)</span>
 
 | Property                       | Env Var                    | Default |
 |--------------------------------|----------------------------|---------|
@@ -803,7 +803,7 @@ an environment-variable override (shown) so none of this needs a rebuild to chan
 | `app.memory.min-similarity`    | `MEMORY_MIN_SIMILARITY`    | `0.75`  |
 | `app.memory.candidate-limit`   | `MEMORY_CANDIDATE_LIMIT`   | `500`   |
 
-### <span style="color:hsl(218,68%,44%)">Inbound security</span>
+### <span style="color:hsl(160,80%,58%)">Inbound security</span>
 
 | Property                               | Env Var                   | Default                                       |
 |----------------------------------------|---------------------------|-----------------------------------------------|
@@ -814,7 +814,7 @@ an environment-variable override (shown) so none of this needs a rebuild to chan
 ---
 
 <a id="feature-flags"></a>
-## <span style="color:hsl(232,68%,44%)">16. 🔹 Feature flags</span>
+## <span style="color:hsl(298,80%,58%)">16. 🔹 Feature flags</span>
 
 Runtime feature flags under `app.features.*` (bound by `FeatureFlagProperties`) let individual
 capabilities be toggled without redeployment:
@@ -835,7 +835,7 @@ vector-only.
 ---
 
 <a id="operational-concerns-recovery-retention-observability"></a>
-## <span style="color:hsl(247,68%,44%)">17. 📈 Operational concerns: recovery, retention, observability</span>
+## <span style="color:hsl(75,80%,58%)">17. 📈 Operational concerns: recovery, retention, observability</span>
 
 <ul>
 
@@ -874,7 +874,7 @@ java -jar target/llm-deep-agent-*.jar --spring.profiles.active=prod
 ---
 
 <a id="known-gaps-and-rough-edges"></a>
-## <span style="color:hsl(261,68%,44%)">18. ⚠️ Known gaps and rough edges</span>
+## <span style="color:hsl(213,80%,58%)">18. ⚠️ Known gaps and rough edges</span>
 
 Documented here rather than glossed over, since they're visible directly in the source:
 
@@ -907,7 +907,7 @@ Documented here rather than glossed over, since they're visible directly in the 
 ---
 
 <a id="port-map-and-tech-stack"></a>
-## <span style="color:hsl(276,68%,44%)">19. 🧰 Port map and tech stack</span>
+## <span style="color:hsl(350,80%,58%)">19. 🧰 Port map and tech stack</span>
 
 | Service                       | Port      |
 |-------------------------------|-----------|
