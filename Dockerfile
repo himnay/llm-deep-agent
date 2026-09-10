@@ -1,4 +1,4 @@
-FROM eclipse-temurin:25-jdk AS build
+FROM eclipse-temurin:26-jdk AS build
 WORKDIR /workspace
 
 # Install private parent POMs that are not in any public Maven registry
@@ -18,13 +18,13 @@ RUN --mount=type=cache,target=/root/.m2 ./mvnw dependency:go-offline -q
 COPY LLM/llm-deep-agent/src src/
 RUN --mount=type=cache,target=/root/.m2 ./mvnw package -DskipTests -q
 
-FROM eclipse-temurin:25-jre AS extract
+FROM eclipse-temurin:26-jre AS extract
 WORKDIR /app
 COPY --from=build /workspace/target/*.jar app.jar
 # Boot 3.3+/4 replaced -Djarmode=layertools with the 'tools' jarmode
 RUN java -Djarmode=tools -jar app.jar extract --layers --launcher --destination extracted
 
-FROM eclipse-temurin:25-jre
+FROM eclipse-temurin:26-jre
 WORKDIR /app
 RUN groupadd --system spring && useradd --system --gid spring spring
 COPY --from=extract /app/extracted/dependencies/ ./
