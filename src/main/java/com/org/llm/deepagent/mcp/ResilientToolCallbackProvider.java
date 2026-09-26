@@ -14,6 +14,8 @@ import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.ai.tool.metadata.ToolMetadata;
 
 import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.*;
 
@@ -34,18 +36,43 @@ public class ResilientToolCallbackProvider implements ToolCallbackProvider {
     private final RetryRegistry retryRegistry;
     private final int toolTimeoutSeconds;
     private final Map<String, String> toolToServer;
+    private final List<String> writeToolKeywords;
 
     public ResilientToolCallbackProvider(
             ToolCallbackProvider delegate,
             CircuitBreakerRegistry circuitBreakerRegistry,
             RetryRegistry retryRegistry,
             int toolTimeoutSeconds,
-            Map<String, String> toolToServer) {
+            Map<String, String> toolToServer,
+            List<String> writeToolKeywords) {
         this.delegate = delegate;
         this.circuitBreakerRegistry = circuitBreakerRegistry;
         this.retryRegistry = retryRegistry;
         this.toolTimeoutSeconds = toolTimeoutSeconds;
         this.toolToServer = toolToServer;
+        this.writeToolKeywords = writeToolKeywords.stream().map(k -> k.trim().toLowerCase(Locale.ROOT)).toList();
+    }
+
+    /** True when the tool's leading verb is a write/destructive verb — such tools are never retried. */
+    boolean isWriteTool(String toolName) {
+        return writeToolKeywords.contains(leadingVerb(toolName));
+    }
+
+    /**
+     * The tool name's leading verb — {@code createIssue} → {@code create}, {@code list_repos} →
+     * {@code list}. Write detection compares whole verbs: substring matching made the read
+     * {@code getDeployments} a "write" because it contains {@code deploy}.
+     */
+    static String leadingVerb(String toolName) {
+        if (toolName == null || toolName.isEmpty()) {
+            return "";
+        }
+        String name = Character.toLowerCase(toolName.charAt(0)) + toolName.substring(1);
+        int end = 0;
+        while (end < name.length() && Character.isLowerCase(name.charAt(end))) {
+            end++;
+        }
+        return name.substring(0, end);
     }
 
     @Override
@@ -57,7 +84,9 @@ public class ResilientToolCallbackProvider implements ToolCallbackProvider {
         String toolName = callback.getToolDefinition().name();
         String serverName = toolToServer.getOrDefault(toolName, "mcp-unknown");
         CircuitBreaker cb = circuitBreakerRegistry.circuitBreaker(serverName);
-        Retry retry = retryRegistry.retry(serverName);
+        // A write whose response was lost (timeout, reset) may already have been applied: retrying it
+        // could create a second GitHub issue or deployment, so only reads are retried.
+        Retry retry = isWriteTool(toolName) ? null : retryRegistry.retry(serverName);
         return new ResilientToolCallback(callback, cb, retry, serverName, toolTimeoutSeconds);
     }
 
@@ -106,7 +135,7 @@ public class ResilientToolCallbackProvider implements ToolCallbackProvider {
             // Retry wraps the circuit breaker — transient failures are retried before the circuit
             // breaker counts them as failures.
             Callable<String> withCb = CircuitBreaker.decorateCallable(circuitBreaker, action);
-            Callable<String> withRetryAndCb = Retry.decorateCallable(retry, withCb);
+            Callable<String> withRetryAndCb = retry == null ? withCb : Retry.decorateCallable(retry, withCb);
             ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
             Future<String> future = executor.submit(withRetryAndCb);
             try {

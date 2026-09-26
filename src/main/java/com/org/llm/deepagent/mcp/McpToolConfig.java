@@ -88,7 +88,9 @@ public class McpToolConfig {
             ObjectProvider<List<McpSyncClient>> mcpSyncClientsProvider,
             CircuitBreakerRegistry circuitBreakerRegistry,
             RetryRegistry retryRegistry,
-            @Value("${agent.step-timeout-seconds:30}") int toolTimeoutSeconds) {
+            @Value("${agent.step-timeout-seconds:30}") int toolTimeoutSeconds,
+            @Value("${agent.mcp.write-tool-keywords:apply,create,update,delete,send,deploy,execute,trigger,rollback,cancel,remove,approve,assign,reschedule,mark}")
+                    List<String> writeToolKeywords) {
 
         List<McpSyncClient> allClients = mcpSyncClientsProvider.stream().flatMap(List::stream).toList();
 
@@ -113,6 +115,6 @@ public class McpToolConfig {
                 SyncMcpToolCallbackProvider.builder().mcpClients(available).build();
 
         return new ResilientToolCallbackProvider(
-                delegate, circuitBreakerRegistry, retryRegistry, toolTimeoutSeconds, TOOL_SERVER);
+                delegate, circuitBreakerRegistry, retryRegistry, toolTimeoutSeconds, TOOL_SERVER, writeToolKeywords);
     }
 }

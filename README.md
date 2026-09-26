@@ -2,7 +2,7 @@
 
 <img src="image/spring-logo.png" alt="logo" width="80"/>
 
-Autonomous agentic orchestration service, built on Spring Boot 4.1.0. `llm-deep-agent` (Maven
+Autonomous agentic orchestration service, built on Spring Boot 4.1.1. `llm-deep-agent` (Maven
 artifact `llm-deep-agent`, Spring application name `llm-orchestrator`) runs multi-step **ReAct**
 (Reason + Act) loops that plan, call an LLM gateway, retrieve grounded context, invoke external
 tools over MCP, delegate to nested sub-agents, and — optionally — remember facts across runs. It
@@ -43,6 +43,13 @@ Port: **8090** | Context path: `/orchestrator/v1` | Base API path: `/api/v1/agen
 
 <a id="what-is-an-agent-orchestrator-and-what-problem-does-it-solve"></a>
 ## <span style="color:hsl(205,80%,58%)">1. 🤖 What is an agent orchestrator, and what problem does it solve?</span>
+
+<p align="center">
+  <img src="image/workflow-vs-agents.png" alt="Workflow: an orchestrator fans out to LLM calls in predefined paths and a synthesizer joins them. Agent: an LLM call chooses a tool action, gets feedback, and loops until done" width="640"/>
+</p>
+
+<p align="center"><sub>This service sits on the right-hand side: the model decides the next action on every turn, inside the
+safety rails described below. Diagram: <a href="https://docs.langchain4j.dev/tutorials/agents">LangChain4j — Agents and agentic AI</a>, Apache-2.0.</sub></p>
 
 A single LLM call is stateless and single-shot: you send a prompt, you get a completion, the
 interaction ends. Most non-trivial tasks — "find out why deployment X is stuck and reschedule it
@@ -924,7 +931,7 @@ Documented here rather than glossed over, since they're visible directly in the 
 
 <ul>
 
-- Spring Boot 4.1.0, Spring AI (MCP client, chat memory, StringTemplate-based prompt templates)
+- Spring Boot 4.1.1, Spring AI 2.0.1 (MCP client, chat memory, StringTemplate-based prompt templates)
 - PostgreSQL (run/step/task/approval/artifact/memory state) with Flyway migrations
 - Keycloak OAuth2 — inbound: `"llm-gateway"` realm; outbound to gateway/RAG/graph-RAG: same
   `"llm-gateway"` realm via `PlatformTokenService`; outbound to MCP: separate `"org-mcp"` realm via

@@ -13,14 +13,19 @@ import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.definition.ToolDefinition;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ResilientToolCallbackProviderTest {
+
+    private static final List<String> WRITE_KEYWORDS = List.of("create", "deploy", "cancel");
 
     private final CircuitBreakerRegistry circuitBreakerRegistry =
             CircuitBreakerRegistry.of(
@@ -50,7 +55,7 @@ class ResilientToolCallbackProviderTest {
                         circuitBreakerRegistry,
                         retryRegistry,
                         5,
-                        Map.of("getDeployments", "deployment"));
+                        Map.of("getDeployments", "deployment"), WRITE_KEYWORDS);
 
         ToolCallback[] wrapped = provider.getToolCallbacks();
 
@@ -72,7 +77,7 @@ class ResilientToolCallbackProviderTest {
                         circuitBreakerRegistry,
                         retryRegistry,
                         5,
-                        Map.of("getDeployments", "deployment"));
+                        Map.of("getDeployments", "deployment"), WRITE_KEYWORDS);
 
         String result = provider.getToolCallbacks()[0].call("{}");
 
@@ -93,7 +98,7 @@ class ResilientToolCallbackProviderTest {
                         circuitBreakerRegistry,
                         retryRegistry,
                         5,
-                        Map.of("getDeployments", "deployment"));
+                        Map.of("getDeployments", "deployment"), WRITE_KEYWORDS);
 
         assertThatThrownBy(() -> provider.getToolCallbacks()[0].call("{}"))
                 .isInstanceOf(McpToolCallException.class)
@@ -114,7 +119,7 @@ class ResilientToolCallbackProviderTest {
                         circuitBreakerRegistry,
                         retryRegistry,
                         5,
-                        Map.of("getDeployments", "deployment"));
+                        Map.of("getDeployments", "deployment"), WRITE_KEYWORDS);
         ToolCallback wrapped = provider.getToolCallbacks()[0];
 
         // Force the circuit open by recording enough failures directly against the breaker.
@@ -135,7 +140,7 @@ class ResilientToolCallbackProviderTest {
 
         ResilientToolCallbackProvider provider =
                 new ResilientToolCallbackProvider(
-                        delegate, circuitBreakerRegistry, retryRegistry, 5, Map.of());
+                        delegate, circuitBreakerRegistry, retryRegistry, 5, Map.of(), WRITE_KEYWORDS);
 
         provider.getToolCallbacks();
 
@@ -157,10 +162,32 @@ class ResilientToolCallbackProviderTest {
                         circuitBreakerRegistry,
                         retryRegistry,
                         5,
-                        Map.of("getDeployments", "deployment"));
+                        Map.of("getDeployments", "deployment"), WRITE_KEYWORDS);
 
         String result = provider.getToolCallbacks()[0].call("{}", null);
 
         assertThat(result).isEqualTo("[]");
+    }
+
+    @Test
+    @DisplayName("write tools are never retried, reads are (a lost response must not apply a write twice)")
+    void writeToolsAreNotRetried() {
+        RetryRegistry twoAttempts = RetryRegistry.of(
+                RetryConfig.custom().maxAttempts(2).waitDuration(Duration.ofMillis(1)).build());
+        ToolCallback write = toolNamed("createIssue");
+        ToolCallback read = toolNamed("getDeployments");
+        when(write.call("{}")).thenThrow(new RuntimeException("reset"));
+        when(read.call("{}")).thenThrow(new RuntimeException("reset"));
+        ToolCallbackProvider delegate = mock(ToolCallbackProvider.class);
+        when(delegate.getToolCallbacks()).thenReturn(new ToolCallback[]{write, read});
+        ToolCallback[] wrapped = new ResilientToolCallbackProvider(
+                delegate, circuitBreakerRegistry, twoAttempts, 5,
+                Map.of("createIssue", "github", "getDeployments", "deployment"), WRITE_KEYWORDS).getToolCallbacks();
+
+        assertThatThrownBy(() -> wrapped[0].call("{}"));
+        assertThatThrownBy(() -> wrapped[1].call("{}"));
+
+        verify(write, times(1)).call("{}");
+        verify(read, times(2)).call("{}");
     }
 }
