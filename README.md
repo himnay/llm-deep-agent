@@ -485,7 +485,7 @@ sequenceDiagram
     actor User as Caller
     participant Ctrl as AgentController
     participant Guard as PromptInjectionGuard
-    participant Loop as AgentLoopExecutor
+    participant Exec as AgentLoopExecutor
     participant DB as PostgreSQL (agent_run/step/task)
     participant Mem as LongTermMemoryService
     participant PTok as PlatformTokenService
@@ -497,53 +497,53 @@ sequenceDiagram
     participant MCP as MCP tool server
 
     User->>Ctrl: POST /api/v1/agent/run {prompt, sessionId}
-    Ctrl->>Loop: startRun(prompt, sessionId, createdBy)
-    Loop->>Guard: isQuerySafe(prompt)
-    Guard-->>Loop: safe
-    Loop->>DB: createRun(...) status=RUNNING
-    Loop-->>Ctrl: AgentRun (status=RUNNING)
+    Ctrl->>Exec: startRun(prompt, sessionId, createdBy)
+    Exec->>Guard: isQuerySafe(prompt)
+    Guard-->>Exec: safe
+    Exec->>DB: createRun(...) status=RUNNING
+    Exec-->>Ctrl: AgentRun (status=RUNNING)
     Ctrl-->>User: 200 OK {runId, status: RUNNING}
 
-    Note over Loop: background virtual thread picks up continueRun(runId)
-    Loop->>Mem: recall(run.prompt())  [first planning call only]
+    Note over Exec: background virtual thread picks up continueRun(runId)
+    Exec->>Mem: recall(run.prompt())  [first planning call only]
     Mem->>PTok: getToken()
     PTok->>KC1: client_credentials (cached after first call)
     KC1-->>PTok: access_token
     Mem->>GW: POST /embed (objective)
     GW-->>Mem: embedding
-    Mem-->>Loop: "Relevant facts remembered..." block (or "")
+    Mem-->>Exec: "Relevant facts remembered..." block (or "")
 
-    Loop->>PTok: getToken()
-    PTok-->>Loop: cached access_token
-    Loop->>GW: POST /query (planner system+user prompt)
-    GW-->>Loop: {"action":"MCP_TOOL","toolName":"createDeployment",...}
+    Exec->>PTok: getToken()
+    PTok-->>Exec: cached access_token
+    Exec->>GW: POST /query (planner system+user prompt)
+    GW-->>Exec: {"action":"MCP_TOOL","toolName":"createDeployment",...}
 
-    Loop->>Loop: isApprovalRequired(MCP_TOOL, "createDeployment") == true
-    Loop->>DB: markAwaitingApproval(runId, plannedAction)
-    Loop--)User: SSE "awaiting_approval" event (if subscribed)
+    Exec->>Exec: isApprovalRequired(MCP_TOOL, "createDeployment") == true
+    Exec->>DB: markAwaitingApproval(runId, plannedAction)
+    Exec--)User: SSE "awaiting_approval" event (if subscribed)
 
     User->>Ctrl: POST /api/v1/agent/run/{id}/approve
-    Ctrl->>Loop: approve(runId, actor)
-    Loop->>DB: claimPendingAction(runId) [race-safe]
-    Loop->>DB: record approval_audit
-    Loop->>Chain: dispatch(context, plannedAction)
+    Ctrl->>Exec: approve(runId, actor)
+    Exec->>DB: claimPendingAction(runId) [race-safe]
+    Exec->>DB: record approval_audit
+    Exec->>Chain: dispatch(context, plannedAction)
     Chain->>MTok: getToken()
     MTok->>KC2: client_credentials (cached after first call)
     KC2-->>MTok: access_token
     Chain->>MCP: createDeployment(args) [w/ retry + circuit breaker]
     MCP-->>Chain: tool result
-    Chain-->>Loop: StepResult.ok(observation)
-    Loop->>Guard: isQuerySafe(observation) [indirect-injection check]
-    Loop->>DB: saveStep(...)
-    Loop--)User: SSE "step" event
+    Chain-->>Exec: StepResult.ok(observation)
+    Exec->>Guard: isQuerySafe(observation) [indirect-injection check]
+    Exec->>DB: saveStep(...)
+    Exec--)User: SSE "step" event
 
-    Note over Loop: loop continues — next planning call
-    Loop->>GW: POST /query (planner sees the new observation)
-    GW-->>Loop: {"action":"FINAL_ANSWER","input":"Deployment created..."}
-    Loop->>DB: complete(runId, COMPLETED, finalAnswer)
-    Loop--)User: SSE "done" event
+    Note over Exec: loop continues — next planning call
+    Exec->>GW: POST /query (planner sees the new observation)
+    GW-->>Exec: {"action":"FINAL_ANSWER","input":"Deployment created..."}
+    Exec->>DB: complete(runId, COMPLETED, finalAnswer)
+    Exec--)User: SSE "done" event
 
-    Loop->>Mem: remember(finalRun) [async, off hot path — long-term-memory-enabled=true]
+    Exec->>Mem: remember(finalRun) [async, off hot path — long-term-memory-enabled=true]
     Mem->>GW: POST /query (distill facts)
     GW-->>Mem: ["fact 1", "fact 2"]
     Mem->>GW: POST /embed (per fact)
@@ -718,12 +718,14 @@ planner into choosing a dangerous tool call still has to pass a human reviewer b
 **Layer 5 — SSRF protection on outbound base URLs (`UrlAllowlistValidator`).** `GatewayClient`,
 `RagClient`, and `GraphRagClient` each call `UrlAllowlistValidator.validate(baseUrl, fieldName)` in
 their constructor, before the underlying `RestClient` is even built. The validator requires an
-`http`/`https` scheme and a resolvable host, and — as implemented today — unconditionally rejects
-any host that resolves to a loopback, link-local, site-local (RFC-1918), or multicast address,
-throwing `IllegalArgumentException` so the application fails fast at startup rather than at request
-time. There is currently no allowlist-override mechanism for legitimately-loopback/private
-downstream URLs (see [Known gaps](#known-gaps-and-rough-edges) for the practical implication of
-this in local/docker-compose development).
+`http`/`https` scheme and a resolvable host, and rejects the base URL if **any** address the host
+resolves to is a wildcard (`0.0.0.0`), link-local (which includes the `169.254.169.254` cloud
+metadata endpoint) or multicast address, throwing `IllegalArgumentException` so the application
+fails fast at startup rather than at request time. Loopback and private ranges (RFC 1918, IPv6
+`fc00::/7`) are rejected too only when `app.security.ssrf.block-private-networks`
+(`SSRF_BLOCK_PRIVATE_NETWORKS`) is `true`. It is off by default because the downstream services run
+on `localhost` or a private Docker network; the earlier always-on check made the default
+`http://localhost:...` base URLs fail at startup outside the `test` profile.
 
 **Layer 6 — Planner output schema validation.** The planner's response is expected to be strict
 JSON matching `PlannedAction`'s shape. `AgentLoopExecutor.parsePlannedAction(...)` parses it with
@@ -810,6 +812,7 @@ an environment-variable override (shown) so none of this needs a rebuild to chan
 | `gateway-auth.enabled`                 | `GATEWAY_AUTH_ENABLED`    | `true`                                        |
 | `gateway-auth.cors.allowed-origins`    | `GATEWAY_CORS_ORIGINS`    | `http://localhost:3000,http://localhost:8080` |
 | `app.security.injection-guard.enabled` | `INJECTION_GUARD_ENABLED` | `true`                                        |
+| `app.security.ssrf.block-private-networks`| `SSRF_BLOCK_PRIVATE_NETWORKS`| `false`                                       |
 
 ---
 
@@ -865,6 +868,15 @@ vector-only.
 
 </ul>
 
+To build and test: JDK 25 and Docker, plus the parent POM chain installed once, because
+`com.org.llm:super-pom` and `learning-bom` are not on Maven Central:
+
+```bash
+(cd ~/projects/learning-bom && mvn -N install)
+(cd ~/projects/super-pom && mvn -N install)
+./mvnw verify    # unit + Testcontainers (PostgreSQL) tests; CI runs the same on every push
+```
+
 ```bash
 mvn spring-boot:run -Dspring-boot.run.arguments=--spring.profiles.active=prod
 # or
@@ -886,13 +898,6 @@ Documented here rather than glossed over, since they're visible directly in the 
   `AgentLoopExecutor.plannerSystemPrompt()` — what the planner's system prompt actually lists as
   valid choices — omits both. The planner LLM will not spontaneously choose either action until that
   string (and the corresponding guidance in `prompts/planner-system.st`) is updated to mention them.
-- **`UrlAllowlistValidator` has no allowlist override.** Despite the class's name, there is currently
-  no configuration surface to permit a specific loopback/private-network URL — it unconditionally
-  rejects loopback/link-local/site-local/multicast hosts. The default configuration in
-  `application.yaml` (`gateway.base-url`, `rag.base-url`, `graph-rag.base-url` all defaulting to
-  `http://localhost:...`) would trip this validator in an environment where `localhost` actually
-  resolves to a loopback address at startup; in practice this only works today where those base
-  URLs are overridden to non-loopback (e.g. docker-compose service DNS) hostnames.
 - **`agent_memory` has no scheduled retention.** `MemoryRepository.deleteOlderThan(cutoff)` exists,
   but unlike `AgentRunRetentionJob` for runs, nothing currently calls it on a schedule — long-term
   memory rows accumulate indefinitely once the feature is enabled.
