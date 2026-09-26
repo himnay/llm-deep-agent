@@ -1,10 +1,10 @@
 package com.org.llm.deepagent.security;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.env.Environment;
-import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Component;
 
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -15,31 +15,25 @@ import java.util.Set;
  * Validates outbound HTTP URLs to prevent SSRF (Server-Side Request Forgery).
  * Call {@link #validate} at startup (e.g. in a {@code @PostConstruct}) for every
  * configured base URL before the first HTTP call is made.
+ * <p>
+ * Wildcard, link-local (which includes the 169.254.169.254 cloud metadata endpoint) and multicast
+ * addresses are always rejected. Loopback and private ranges are rejected only when
+ * {@link SsrfProperties#isBlockPrivateNetworks()} is on, because the platform services normally
+ * run on localhost or a private network. Every address the host resolves to is checked.
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class UrlAllowlistValidator {
 
     private static final Set<String> ALLOWED_SCHEMES = Set.of("http", "https");
 
-    /**
-     * Under the {@code test} profile, every downstream platform service (llm-gateway-core,
-     * llm-rag-pipeline, ...) legitimately runs on {@code localhost} — that's the whole point of
-     * the local/test stack, not an attacker-controlled value. Real deployments always resolve
-     * these base URLs to real hosts via env vars, so this carve-out never applies outside tests.
-     */
-    private static final String TEST_PROFILE = "test";
-
-    private final Environment environment;
-
-    public UrlAllowlistValidator(Environment environment) {
-        this.environment = environment;
-    }
+    private final SsrfProperties properties;
 
     /**
-     * Validates that {@code url} has an allowed scheme and a non-blank host.
-     * Throws {@link IllegalArgumentException} on any violation so the application
-     * fails fast at startup rather than at runtime.
+     * Validates that {@code url} has an allowed scheme, a non-blank host, and resolves only to
+     * allowed addresses. Throws {@link IllegalArgumentException} on any violation so the
+     * application fails fast at startup rather than at runtime.
      *
      * @param url       the URL to validate
      * @param fieldName human-readable name used in error messages
@@ -65,23 +59,46 @@ public class UrlAllowlistValidator {
             throw new IllegalArgumentException(
                     "SSRF | " + fieldName + " has no host component: " + url);
         }
+        InetAddress[] addresses;
         try {
-            InetAddress addr = InetAddress.getByName(host);
-            boolean isPrivateOrReserved = addr.isLoopbackAddress() || addr.isLinkLocalAddress()
-                    || addr.isSiteLocalAddress() || addr.isMulticastAddress();
-            if (isPrivateOrReserved && !environment.acceptsProfiles(Profiles.of(TEST_PROFILE))) {
-                throw new IllegalArgumentException(
-                        "SSRF | " + fieldName + " resolves to a private/reserved address: " + host);
-            }
-            if (isPrivateOrReserved) {
-                log.debug(
-                        "SSRF | {} resolves to a private/reserved address ({}) — allowed under the '{}' profile",
-                        fieldName, host, TEST_PROFILE);
-            }
+            addresses = InetAddress.getAllByName(host);
         } catch (UnknownHostException e) {
             throw new IllegalArgumentException(
                     "SSRF | " + fieldName + " host cannot be resolved: " + host, e);
         }
+        for (InetAddress address : addresses) {
+            String blocked = blockedAddressClass(address);
+            if (blocked != null) {
+                throw new IllegalArgumentException("SSRF | " + fieldName + " resolves to a " + blocked
+                        + " address: " + host + " -> " + address.getHostAddress());
+            }
+        }
         log.debug("SSRF | URL validated: {} = {}", fieldName, url);
+    }
+
+    private String blockedAddressClass(InetAddress address) {
+        if (address.isAnyLocalAddress()) {
+            return "wildcard";
+        }
+        if (address.isLinkLocalAddress()) {
+            return "link-local";
+        }
+        if (address.isMulticastAddress()) {
+            return "multicast";
+        }
+        if (properties.isBlockPrivateNetworks()) {
+            if (address.isLoopbackAddress()) {
+                return "loopback";
+            }
+            if (address.isSiteLocalAddress() || isUniqueLocalIpv6(address)) {
+                return "private";
+            }
+        }
+        return null;
+    }
+
+    /** fc00::/7 — the IPv6 counterpart of RFC 1918, which {@link InetAddress#isSiteLocalAddress()} does not cover. */
+    private static boolean isUniqueLocalIpv6(InetAddress address) {
+        return address instanceof Inet6Address && (address.getAddress()[0] & 0xFE) == 0xFC;
     }
 }

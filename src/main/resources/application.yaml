@@ -6,6 +6,10 @@ app:
     artifact-id: llm-orchestrator
     project-version: 0.0.1-SNAPSHOT
   security:
+    ssrf:
+      # Opt-in: also reject loopback/private base URLs. Off by default because the platform
+      # services normally run on localhost or a private Docker network.
+      block-private-networks: ${SSRF_BLOCK_PRIVATE_NETWORKS:false}
     injection-guard:
       enabled: ${INJECTION_GUARD_ENABLED:true}
       block-message: "Your request contains disallowed instructions and cannot be processed."
