@@ -1,4 +1,6 @@
-FROM eclipse-temurin:25-jdk AS build
+# Java 27 images: eclipse-temurin:27 wasn't on Docker Hub yet (Sept 2026), so these stages use
+# SapMachine 27, an OpenJDK build that is also a Docker Official Image.
+FROM sapmachine:27-jdk-ubuntu AS build
 WORKDIR /workspace
 
 # Install private parent POMs that are not in any public Maven registry
@@ -18,15 +20,20 @@ RUN --mount=type=cache,target=/root/.m2 ./mvnw dependency:go-offline -q
 COPY LLM/llm-deep-agent/src src/
 RUN --mount=type=cache,target=/root/.m2 ./mvnw package -DskipTests -q
 
-FROM eclipse-temurin:25-jre AS extract
+FROM sapmachine:27-jre-ubuntu AS extract
 WORKDIR /app
 COPY --from=build /workspace/target/*.jar app.jar
 # Boot 3.3+/4 replaced -Djarmode=layertools with the 'tools' jarmode
 RUN java -Djarmode=tools -jar app.jar extract --layers --launcher --destination extracted
 
-FROM eclipse-temurin:25-jre
+FROM sapmachine:27-jre-ubuntu
 WORKDIR /app
-RUN groupadd --system spring && useradd --system --gid spring spring
+# The SapMachine image has no curl; the HEALTHCHECK below needs it
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+# The logback config writes logs/llm-orchestrator.json under /app, which the non-root user must be able to create
+RUN groupadd --system spring && useradd --system --gid spring spring \
+    && mkdir -p /app/logs && chown spring:spring /app/logs
 COPY --from=extract /app/extracted/dependencies/ ./
 COPY --from=extract /app/extracted/spring-boot-loader/ ./
 COPY --from=extract /app/extracted/snapshot-dependencies/ ./

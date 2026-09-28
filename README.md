@@ -875,7 +875,7 @@ vector-only.
 
 </ul>
 
-To build and test: JDK 25 and Docker, plus the parent POM chain installed once, because
+To build and test: JDK 27 and Docker, plus the parent POM chain installed once, because
 `com.org.llm:super-pom` and `learning-bom` are not on Maven Central:
 
 ```bash
