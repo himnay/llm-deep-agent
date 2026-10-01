@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: llm-deep-agent
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           java-version: '27'
           distribution: 'temurin'
