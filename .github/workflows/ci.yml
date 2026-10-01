@@ -10,15 +10,15 @@ jobs:
     steps:
       # The parent chain (super-pom -> learning-bom) is not published to Maven Central,
       # so check both out and install them into the runner's local repository first.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: himnay/learning-bom
           path: learning-bom
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: himnay/super-pom
           path: super-pom
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: llm-deep-agent
       - uses: actions/setup-java@v4
