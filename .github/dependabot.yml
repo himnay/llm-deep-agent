@@ -1,7 +1,21 @@
 version: 2
+registries:
+  # super-pom and learning-bom are published to GitHub Packages (not Maven Central)
+  super-pom:
+    type: maven-repository
+    url: https://maven.pkg.github.com/himnay/super-pom
+    username: himnay
+    password: ${{secrets.PACKAGES_READ_TOKEN}}
+  learning-bom:
+    type: maven-repository
+    url: https://maven.pkg.github.com/himnay/learning-bom
+    username: himnay
+    password: ${{secrets.PACKAGES_READ_TOKEN}}
+
 updates:
   - package-ecosystem: maven
     directory: "/"
+    registries: [ super-pom, learning-bom ]
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
